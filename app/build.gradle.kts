@@ -173,7 +173,14 @@ android {
             isShrinkResources = false
 //            isDebuggable = true
             isProfileable = true
+            matchingFallbacks += listOf("release")         // Separate Android TV build
+        create("tv") {
+            initWith(getByName("release"))
+            applicationIdSuffix = ".tv"
+            isMinifyEnabled = false
+            isShrinkResources = false
             matchingFallbacks += listOf("release")
+        }
         }
     }
 
