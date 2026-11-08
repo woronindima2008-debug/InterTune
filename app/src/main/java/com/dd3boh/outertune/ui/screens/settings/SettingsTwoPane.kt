@@ -9,6 +9,7 @@ package com.dd3boh.outertune.ui.screens.settings
 import com.dd3boh.outertune.ui.component.ScreenBackHandler
 import androidx.annotation.StringRes
 import androidx.compose.foundation.background
+import androidx.compose.foundation.focusGroup
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -94,7 +95,6 @@ import com.dd3boh.outertune.ui.component.LocalTopBarTitle
 import com.dd3boh.outertune.ui.component.LocalTopBarUp
 import com.dd3boh.outertune.ui.screens.walkthrough.Tour
 import com.dd3boh.outertune.ui.screens.walkthrough.tourTarget
-import com.dd3boh.outertune.ui.utils.dpadOverlay
 import com.dd3boh.outertune.ui.utils.dpadFocusIndicator
 import com.dd3boh.outertune.ui.utils.AskForMusicOnOpening
 import com.dd3boh.outertune.ui.utils.LocalLandscape
@@ -279,7 +279,6 @@ fun SettingsTwoPane(
             modifier = Modifier
                 .width(settingsListWidth(LocalLandscape.current.windowWidth))
                 .fillMaxHeight()
-                .dpadOverlay()
         ) {
         // Under the top bar. On a phone on its side the mini player stands under the other half
         // and the list runs down to the gesture bar; in a tall window, a tablet's, the mini player
@@ -289,6 +288,7 @@ fun SettingsTwoPane(
             modifier = Modifier
                 .fillMaxSize()
                 .verticalScroll(rememberScrollState())
+                .focusGroup()
                 .windowInsetsPadding((if (LocalLandscape.current.active) headerPaneInsets() else paneInsets()).union(WindowInsets.ime))
                 .padding(start = 12.dp, end = 4.dp, bottom = 12.dp),
         ) {
@@ -336,7 +336,7 @@ fun SettingsTwoPane(
             modifier = Modifier
                 .weight(1f)
                 .fillMaxHeight()
-                .dpadOverlay()
+                .focusGroup()
         ) {
             val showing = open.last()
             // A screen with another under it goes back to that one. The one from the list has
