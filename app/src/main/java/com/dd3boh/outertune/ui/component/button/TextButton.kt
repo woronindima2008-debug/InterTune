@@ -17,6 +17,7 @@ import androidx.compose.ui.graphics.painter.Painter
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.unit.dp
 import com.dd3boh.outertune.constants.MenuCornerRadius
+import com.dd3boh.outertune.ui.utils.dpadFocusIndicator
 
 @Composable
 fun IconLabelButton(
@@ -34,6 +35,7 @@ fun IconLabelButton(
         .clip(RoundedCornerShape(MenuCornerRadius))
         .background(background)
         .clickable { onClick() }
+        .dpadFocusIndicator(RoundedCornerShape(MenuCornerRadius))
         .padding(horizontal = 8.dp)
 ) {
     Icon(
