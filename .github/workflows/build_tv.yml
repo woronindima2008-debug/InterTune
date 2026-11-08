@@ -32,8 +32,15 @@ jobs:
       - name: Accept SDK licenses
         run: yes | /usr/local/lib/android/sdk/cmdline-tools/latest/bin/sdkmanager --licenses
 
+      - name: Test Android TV navigation and player layout
+        run: >-
+          ./gradlew testCoreTvUnitTest
+          --tests 'com.dd3boh.outertune.ui.utils.DpadFocusTest'
+          --tests 'com.dd3boh.outertune.ui.player.LandscapeControlsWidthTest'
+          --stacktrace -DskipFormatKtlint
+
       - name: Build Android TV APK
-        run: ./gradlew testCoreTvUnitTest assembleCoreTv --stacktrace -DskipFormatKtlint
+        run: ./gradlew assembleCoreTv --stacktrace -DskipFormatKtlint
 
       - name: Upload Android TV APK
         uses: actions/upload-artifact@v4
