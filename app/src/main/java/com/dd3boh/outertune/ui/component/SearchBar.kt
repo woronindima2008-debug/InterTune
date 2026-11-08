@@ -266,9 +266,11 @@ fun SearchBar(
                     end = endPadding
                 )
                 .size(width = width, height = height)
-                // While expanded, search is a floating full-screen surface and owns D-pad
-                // traversal. In its collapsed pill state, let Compose move Down into page content.
-                .then(if (animationProgress > 0.5f) Modifier.dpadOverlay() else Modifier)
+                // Keep the search surface in D-pad overlay traversal in BOTH states.
+                // After Back closes the keyboard/full-screen search, the focused search field
+                // must still hand Down to the first visible item on every destination screen;
+                // the screen-wide D-pad search handles that transition across focus groups.
+                .dpadOverlay()
                 .then(if (glass != null && animationProgress < 1f) Modifier.floatingGlass(glass, animatedShape) else Modifier)
         ) {
             Column {
