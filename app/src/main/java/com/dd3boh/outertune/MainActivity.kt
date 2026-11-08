@@ -2187,6 +2187,10 @@ class MainActivity : ComponentActivity() {
                                     // top of the open player, and swallowed every tap on its left strip.
                                     modifier = Modifier
                                         .align(alignment)
+                                        // Treat the TV side rail as an overlay for D-pad focus search:
+                                        // Right from a selected navigation item must reach the page
+                                        // content, rather than continuing down the rail to its last item.
+                                        .dpadOverlay()
                                         .blockFocusWhen(screenCovered)
                                         .fillMaxHeight()
                                         .offset {
