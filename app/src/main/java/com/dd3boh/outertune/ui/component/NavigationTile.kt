@@ -125,6 +125,7 @@ fun NavigationTile(
                 .clip(CircleShape)
                 .background(MaterialTheme.colorScheme.surfaceColorAtElevation(6.dp))
                 .clickable(onClick = onClick)
+                .dpadFocusIndicator(CircleShape)
                 // The button is the circle, and its name is written under it, outside it: a
                 // screen reader had a button with nothing to say, then a word that did nothing.
                 .semantics { contentDescription = title }
