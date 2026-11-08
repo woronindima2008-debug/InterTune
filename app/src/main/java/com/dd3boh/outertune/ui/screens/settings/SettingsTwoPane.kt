@@ -94,6 +94,7 @@ import com.dd3boh.outertune.ui.component.LocalTopBarTitle
 import com.dd3boh.outertune.ui.component.LocalTopBarUp
 import com.dd3boh.outertune.ui.screens.walkthrough.Tour
 import com.dd3boh.outertune.ui.screens.walkthrough.tourTarget
+import com.dd3boh.outertune.ui.utils.dpadOverlay
 import com.dd3boh.outertune.ui.utils.AskForMusicOnOpening
 import com.dd3boh.outertune.ui.utils.LocalLandscape
 import com.dd3boh.outertune.ui.utils.headerPaneInsets
@@ -277,6 +278,7 @@ fun SettingsTwoPane(
             modifier = Modifier
                 .width(settingsListWidth(LocalLandscape.current.windowWidth))
                 .fillMaxHeight()
+                .dpadOverlay()
         ) {
         // Under the top bar. On a phone on its side the mini player stands under the other half
         // and the list runs down to the gesture bar; in a tall window, a tablet's, the mini player
@@ -333,6 +335,7 @@ fun SettingsTwoPane(
             modifier = Modifier
                 .weight(1f)
                 .fillMaxHeight()
+                .dpadOverlay()
         ) {
             val showing = open.last()
             // A screen with another under it goes back to that one. The one from the list has
