@@ -3444,6 +3444,16 @@ class MusicService : MediaLibraryService(),
     }
 
     private fun createRenderersFactory(gaplessOffloadAllowed: Boolean): DefaultRenderersFactory {
+        // Android TV devices expose a much wider range of AudioTrack implementations than phones.
+        // Start with Media3's standard sink on TV: the phone-oriented custom processor/offload
+        // pipeline can select an output path that some TV firmwares cannot initialise correctly.
+        // Keep the full processing pipeline unchanged on phones and use decoder fallback on TV.
+        if (BuildConfig.BUILD_TYPE == "tv") {
+            return DefaultRenderersFactory(this@MusicService)
+                .setEnableDecoderFallback(true)
+                .setExtensionRendererMode(audioDecoder)
+        }
+
         if (ENABLE_FFMETADATAEX) {
             return object : NextRenderersFactory(this@MusicService) {
                 override fun buildAudioSink(
