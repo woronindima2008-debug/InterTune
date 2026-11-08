@@ -927,10 +927,11 @@ fun BottomSheetPlayer(
             val landscapePlayer = isLandscape && !tabMode
             val hPadding = when {
                 compactPlayer -> CompactPlayerGutter
-                landscapePlayer && tvBuild -> 16.dp
+                landscapePlayer && tvBuild -> 12.dp
                 landscapePlayer -> 24.dp
                 else -> PlayerHorizontalPadding
             }
+            val playButtonGap = if (landscapePlayer && tvBuild) 6.dp else PlayButtonGap
             val titleSize = if (landscapePlayer) 25.sp else TextUnit.Unspecified
             val artistSize = if (landscapePlayer) 19.sp else TextUnit.Unspecified
 
@@ -943,7 +944,7 @@ fun BottomSheetPlayer(
              * size as lyrics came up read as the player shrinking its buttons. The lyrics take the
              * artwork's place, which is plenty of room without the controls giving any up.
              */
-            val controlSizes = playerControlSizes(landscapePlayer = landscapePlayer, compact = compactPlayer)
+            val controlSizes = playerControlSizes(landscapePlayer = landscapePlayer, compact = compactPlayer, tvBuild = tvBuild)
             val transportIconSize = controlSizes.transportIcon
             val playButtonSize = controlSizes.playButton
 
@@ -1561,7 +1562,7 @@ fun BottomSheetPlayer(
                             }
                         }
 
-                        Spacer(Modifier.width(PlayButtonGap))
+                        Spacer(Modifier.width(playButtonGap))
 
                         Box(
                             modifier = Modifier
@@ -1690,6 +1691,8 @@ fun BottomSheetPlayer(
                     slots = if (seekIncrement != SeekIncrement.OFF) 6 else 4,
                     gutter = hPadding,
                     maxControlsFraction = if (tvBuild) 0.78f else 0.62f,
+                    slot = if (tvBuild) 48.dp else LandscapeTransportSlot,
+                    playButtonGap = if (tvBuild) 6.dp else PlayButtonGap,
                 )
                 Row(modifier = Modifier.fillMaxSize()) {
                     // The queue sheet's peek is reserved on the controls column alone, not on this
@@ -2085,8 +2088,10 @@ internal fun landscapeControlsWidth(
     slots: Int,
     gutter: Dp,
     maxControlsFraction: Float = 0.62f,
+    slot: Dp = LandscapeTransportSlot,
+    playButtonGap: Dp = PlayButtonGap,
 ): Dp {
-    val needed = LandscapeTransportSlot * slots + playButton + PlayButtonGap * 2 + gutter * 2
+    val needed = slot * slots + playButton + playButtonGap * 2 + gutter * 2
     val maxFraction = maxControlsFraction.coerceIn(0.5f, 0.9f)
     return (available / 2).coerceAtLeast(needed).coerceAtMost(available * maxFraction)
 }
