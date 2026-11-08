@@ -533,15 +533,32 @@ fun Modifier.dpadOverlayEscape(tvNavigation: Boolean = false): Modifier = compos
     onFocusEvent { anythingFocused[0] = it.hasFocus }.onPreviewKeyEvent { event ->
         if (event.type != KeyEventType.KeyDown) return@onPreviewKeyEvent false
         val direction = event.dpadDirection() ?: return@onPreviewKeyEvent false
-        // On TV, do not leave navigation to Compose's focus tree alone. Its grouping of a
-        // navigation rail, lazy lists and floating sheets can make the nearest visible control
-        // look like it is outside the current group, so Down stays in the rail or stops at a
-        // search field. Search the visible screen for every D-pad direction instead.
+        // On TV, let Compose handle ordinary content first. Its focus search is the part
+        // that knows how to bring the next, not-yet-composed LazyColumn item into view. The
+        // screen-wide geometry search is only a fallback for ordinary content, and remains
+        // first for floating overlays whose controls sit outside the normal focus groups.
         if (tvNavigation) {
             val owner = (view as? RootForTest)?.semanticsOwner ?: return@onPreviewKeyEvent false
+
+            // Left/right inside an editable field belong to text editing, not focus traversal.
+            if ((direction == DpadDirection.Left || direction == DpadDirection.Right) &&
+                focusedNodeIsEditable(owner.unmergedRootSemanticsNode)
+            ) return@onPreviewKeyEvent false
+
+            if (overlaysFocused.get() == 0) {
+                val nativeDirection = when (direction) {
+                    DpadDirection.Up -> FocusDirection.Up
+                    DpadDirection.Down -> FocusDirection.Down
+                    DpadDirection.Left -> FocusDirection.Left
+                    DpadDirection.Right -> FocusDirection.Right
+                }
+                if (focusManager.moveFocus(nativeDirection)) return@onPreviewKeyEvent true
+            }
+
             if ((direction == DpadDirection.Up || direction == DpadDirection.Down) &&
                 scrollListInstead(view, direction)
             ) return@onPreviewKeyEvent true
+
             return@onPreviewKeyEvent when (
                 moveFromOverlay(owner.unmergedRootSemanticsNode, direction, fromAnywhere = true)
             ) {
@@ -592,6 +609,18 @@ private fun SemanticsNode.unclippedBounds(): Rect =
 
 private fun SemanticsConfiguration.isFocusable(): Boolean =
     SemanticsProperties.Focused in this && SemanticsActions.RequestFocus in this && SemanticsProperties.Disabled !in this
+
+/** True when the currently focused semantics node is an editable text field. */
+private fun focusedNodeIsEditable(root: SemanticsNode): Boolean {
+    fun visit(node: SemanticsNode): Boolean {
+        val config = node.config
+        if (config.getOrElse(SemanticsProperties.Focused) { false } &&
+            SemanticsProperties.EditableText in config
+        ) return true
+        return node.children.any(::visit)
+    }
+    return visit(root)
+}
 
 /**
  * Scrolls the list holding focus by [DpadEdgeScrollFraction] of its height when [dpadScrollsInstead]
