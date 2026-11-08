@@ -105,8 +105,11 @@ fun SettingsScreen(
     LaunchedEffect(tourRunning) { if (tourRunning) query = "" }
     if (Unreleased.SETTINGS_SEARCH) ScreenBackHandler(enabled = query.isNotEmpty()) { query = "" }
 
-    // A window wide enough for it has the list and the chosen screen side by side.
-    if (Unreleased.SETTINGS_TWO_PANE && LocalLandscape.current.windowWidth >= SettingsTwoPaneMinWidth) {
+    val tvBuild = com.dd3boh.outertune.BuildConfig.BUILD_TYPE == "tv"
+
+    // A window wide enough for it has the list and the chosen screen side by side. On TV keep
+    // settings as one vertical page: two independently scrolling panes are awkward on a remote.
+    if (!tvBuild && Unreleased.SETTINGS_TWO_PANE && LocalLandscape.current.windowWidth >= SettingsTwoPaneMinWidth) {
         SettingsTwoPane(navController, scrollBehavior, tourRunning, query, onQueryChange = { query = it })
         return
     }
@@ -273,7 +276,7 @@ fun SettingsScreen(
 
     // On its side the window shows three rows of a list of eleven, so the cards go two by two:
     // the two about the music on one side, the two about the app on the other.
-    val twoByTwo = LocalLandscape.current.active
+    val twoByTwo = LocalLandscape.current.active && !tvBuild
     ColumnWithContentPadding(
         modifier = Modifier.fillMaxHeight(),
         columnModifier = Modifier
