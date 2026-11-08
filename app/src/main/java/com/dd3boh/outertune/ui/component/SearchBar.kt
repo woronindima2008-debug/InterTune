@@ -266,9 +266,9 @@ fun SearchBar(
                     end = endPadding
                 )
                 .size(width = width, height = height)
-                // The closed pill floats above page content; while open, the full-screen search
-                // owns focus and must keep arrows away from controls hidden underneath it.
-                .dpadOverlay()
+                // While expanded, search is a floating full-screen surface and owns D-pad
+                // traversal. In its collapsed pill state, let Compose move Down into page content.
+                .then(if (animationProgress > 0.5f) Modifier.dpadOverlay() else Modifier)
                 .then(if (glass != null && animationProgress < 1f) Modifier.floatingGlass(glass, animatedShape) else Modifier)
         ) {
             Column {
