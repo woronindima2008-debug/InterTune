@@ -534,7 +534,7 @@ fun BottomSheetPlayer(
      * through to the stacked portrait layout, which already reserved the queue peek correctly and
      * must not be perturbed.
      */
-    val landscapeTwoPane = isLandscape && !tabMode && wideScreen
+    val landscapeTwoPane = shouldUseLandscapePlayerLayout(isLandscape, tabMode, wideScreen, tvBuild)
 
     /**
      * A tablet in landscape, which is the case with width to spare for a permanent queue pane.
@@ -1659,7 +1659,7 @@ fun BottomSheetPlayer(
             }
 
 
-            if (LocalConfiguration.current.orientation == Configuration.ORIENTATION_LANDSCAPE && !tabMode && wideScreen) {
+            if (landscapeTwoPane) {
                 val vPadding = max(
                     WindowInsets.safeDrawing.getTop(LocalDensity.current),
                     WindowInsets.safeDrawing.getBottom(LocalDensity.current)
@@ -2368,6 +2368,19 @@ private fun SeekBar(
         )
     }
 }
+
+/**
+ * Whether the player uses its landscape artwork-and-controls layout.
+ * Android TV must use it even when its reported screenWidthDp is below the generic 600dp
+ * widescreen threshold: the TV build has its own control sizing and the stacked phone layout
+ * leaves the controls competing with lyrics on a television.
+ */
+internal fun shouldUseLandscapePlayerLayout(
+    isLandscape: Boolean,
+    tabMode: Boolean,
+    wideScreen: Boolean,
+    tvBuild: Boolean,
+): Boolean = isLandscape && !tabMode && (wideScreen || tvBuild)
 
 /**
  * Whether the player lays itself out for a tablet on its side, as Context.tabMode says: read from
