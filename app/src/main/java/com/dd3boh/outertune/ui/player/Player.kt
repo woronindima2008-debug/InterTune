@@ -21,6 +21,7 @@ import androidx.compose.runtime.rememberUpdatedState
 import com.dd3boh.outertune.ui.utils.LocalAppBackdrop
 import com.dd3boh.outertune.ui.utils.LocalGlassStill
 import com.dd3boh.outertune.ui.utils.stillGlass
+import com.dd3boh.outertune.ui.utils.dpadOverlay
 import com.dd3boh.outertune.ui.utils.LocalLandscape
 import com.dd3boh.outertune.ui.utils.CoverBlur
 import com.kyant.backdrop.effects.vibrancy
@@ -754,7 +755,7 @@ fun BottomSheetPlayer(
     // mini player never pays for it, and a no-op below API 33.
     BottomSheet(
         state = state,
-        modifier = modifier,
+        modifier = modifier.dpadOverlay(),
         background = {
             Log.v(TAG, "PLR-2.1")
             Box(
