@@ -131,6 +131,7 @@ fun <T> ListPreference(
                             showDialog = false
                             onValueSelected(value)
                         }
+                        .dpadFocusIndicator(RoundedCornerShape(10.dp))
                         .padding(horizontal = 16.dp, vertical = 12.dp)
                 ) {
                     RadioButton(
