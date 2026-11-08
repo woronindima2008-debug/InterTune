@@ -156,6 +156,15 @@ class DpadFocusTest {
     }
 
     @Test
+    fun `scrollable content inside a D-pad overlay keeps native key navigation`() {
+        assertTrue(dpadLeavesToCompose(fromAnywhere = true, inOverlay = true, focusedInScroller = true))
+        assertFalse(dpadLeavesToCompose(fromAnywhere = true, inOverlay = true, focusedInScroller = false))
+        assertFalse(dpadLeavesToCompose(fromAnywhere = true, inOverlay = false, focusedInScroller = false))
+        assertTrue(dpadLeavesToCompose(fromAnywhere = false, inOverlay = false, focusedInScroller = false))
+        assertTrue(dpadLeavesToCompose(fromAnywhere = false, inOverlay = true, focusedInScroller = true))
+    }
+
+    @Test
     fun `the screen is searched only from a floating control or with nothing focused`() {
         assertTrue(needsScreenSearch(anythingFocused = false, overlaysFocused = 0))
         assertTrue(needsScreenSearch(anythingFocused = true, overlaysFocused = 1))
