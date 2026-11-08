@@ -11,6 +11,7 @@ import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.LocalIndication
 import androidx.compose.foundation.focusGroup
 import androidx.compose.foundation.focusable
+import androidx.compose.foundation.border
 import androidx.compose.foundation.gestures.BringIntoViewSpec
 import androidx.compose.foundation.gestures.LocalBringIntoViewSpec
 import androidx.compose.foundation.indication
@@ -20,10 +21,17 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.ProvidedValue
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Shape
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.ui.unit.dp
 import androidx.compose.ui.composed
 import androidx.compose.ui.focus.FocusDirection
 import androidx.compose.ui.focus.focusProperties
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.focus.onFocusEvent
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.input.InputMode
@@ -122,6 +130,25 @@ fun Modifier.dpadOverlay(): Modifier = semantics { dpadOverlay = true }.composed
             if (state.hasFocus) overlaysFocused.incrementAndGet() else overlaysFocused.decrementAndGet()
         }
     }
+}
+
+/**
+ * A visible focus outline for controls operated by a TV remote or keyboard.
+ *
+ * It is deliberately driven by keyboard input mode, so touch use keeps the original appearance.
+ * Apply it to the clickable surface (not just its icon) so the whole target is visibly selected.
+ */
+fun Modifier.dpadFocusIndicator(shape: Shape = RoundedCornerShape(12.dp)): Modifier = composed {
+    val keyboardMode = LocalInputModeManager.current.inputMode == InputMode.Keyboard
+    var focused by remember { mutableStateOf(false) }
+    onFocusChanged { focused = it.isFocused }
+        .then(
+            if (keyboardMode && focused) {
+                Modifier.border(2.dp, MaterialTheme.colorScheme.primary, shape)
+            } else {
+                Modifier
+            }
+        )
 }
 
 /** How many floating controls hold focus right now; see [dpadOverlay]. */
