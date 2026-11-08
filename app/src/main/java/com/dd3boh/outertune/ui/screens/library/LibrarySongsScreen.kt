@@ -4,6 +4,7 @@ import com.dd3boh.outertune.ui.component.ScreenBackHandler
 import android.content.pm.PackageManager
 import android.util.Log
 import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.focusGroup
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -320,7 +321,9 @@ fun LibrarySongsScreen(
         LazyColumn(
             state = lazyListState,
             contentPadding = LocalPlayerAwareWindowInsets.current.asPaddingValues(),
-            modifier = Modifier.padding(bottom = if (inSelectMode) 64.dp else 0.dp)
+            modifier = Modifier
+                .focusGroup()
+                .padding(bottom = if (inSelectMode) 64.dp else 0.dp)
         ) {
             item(
                 key = "filter",
