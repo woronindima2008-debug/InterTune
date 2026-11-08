@@ -2377,6 +2377,9 @@ private fun SeekBar(
  */
 @Composable
 internal fun rememberTabMode(): Boolean {
+    // Android TV reports a large smallestScreenWidthDp and was therefore mistaken for a tablet.
+    // That selected the tablet player layout, bypassing the TV landscape control sizing entirely.
+    if (com.dd3boh.outertune.BuildConfig.BUILD_TYPE == "tv") return false
     val configuration = LocalConfiguration.current
     val forced by rememberNullablePreference(TabletUiKey)
     return tabMode(configuration.smallestScreenWidthDp, configuration.orientation == Configuration.ORIENTATION_LANDSCAPE, forced)
