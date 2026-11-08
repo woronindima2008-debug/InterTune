@@ -101,6 +101,7 @@ import com.dd3boh.outertune.ui.component.PlayingIndicatorBox
 import com.dd3boh.outertune.ui.utils.SameTextSize
 import com.dd3boh.outertune.ui.utils.canWrap
 import com.dd3boh.outertune.ui.utils.shrinkToFit
+import com.dd3boh.outertune.ui.utils.dpadFocusIndicator
 import com.dd3boh.outertune.utils.LocalArtworkPath
 import com.dd3boh.outertune.utils.albumSongsToPlay
 import com.dd3boh.outertune.utils.getDownloadState
@@ -626,6 +627,7 @@ fun YouTubeCardItem(
             .clip(RoundedCornerShape(6.dp))
             .background(MaterialTheme.colorScheme.surfaceColorAtElevation(6.dp))
             .clickable(onClick = onClick)
+            .dpadFocusIndicator(RoundedCornerShape(6.dp))
     ) {
         Box(
             contentAlignment = Alignment.Center
@@ -816,6 +818,7 @@ fun BoxScope.AlbumPlayButton(
                 .clip(CircleShape)
                 .background(Color.Black.copy(alpha = ActiveBoxAlpha))
                 .clickable(onClick = onClick)
+                .dpadFocusIndicator(CircleShape)
         ) {
             Icon(
                 painter = painterResource(R.drawable.play),
