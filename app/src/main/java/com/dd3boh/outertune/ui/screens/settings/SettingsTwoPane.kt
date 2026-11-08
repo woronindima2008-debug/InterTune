@@ -95,6 +95,7 @@ import com.dd3boh.outertune.ui.component.LocalTopBarUp
 import com.dd3boh.outertune.ui.screens.walkthrough.Tour
 import com.dd3boh.outertune.ui.screens.walkthrough.tourTarget
 import com.dd3boh.outertune.ui.utils.dpadOverlay
+import com.dd3boh.outertune.ui.utils.dpadFocusIndicator
 import com.dd3boh.outertune.ui.utils.AskForMusicOnOpening
 import com.dd3boh.outertune.ui.utils.LocalLandscape
 import com.dd3boh.outertune.ui.utils.headerPaneInsets
@@ -388,6 +389,7 @@ private fun SettingsCategoryRow(
             .clip(shape)
             .background(if (chosen) MaterialTheme.colorScheme.secondaryContainer else Color.Transparent)
             .selectable(selected = chosen, role = Role.Tab, onClick = onClick)
+            .dpadFocusIndicator(shape)
             .padding(horizontal = 14.dp, vertical = 11.dp),
     ) {
         BadgedBox(
