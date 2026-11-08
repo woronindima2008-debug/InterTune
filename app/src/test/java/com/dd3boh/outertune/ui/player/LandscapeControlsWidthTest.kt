@@ -66,6 +66,16 @@ class LandscapeControlsWidthTest {
     }
 
     @Test
+    fun `TV gives the transport row more room without changing phone sizing`() {
+        // Six-button playback on a 520dp TV window keeps its 42dp icons visible; the artwork
+        // yields width on TV rather than clipping the outer transport buttons.
+        val tvControls = landscapeControlsWidth(520.dp, play, 6, 16.dp, maxControlsFraction = 0.78f)
+        val tvSlot = (tvControls - 32.dp - play - 16.dp) / 6
+        assertTrue("TV transport icon squeezed: $tvSlot", tvSlot >= icon)
+        assertEquals(0.62f, (landscapeControlsWidth(800.dp, play, 4, gutter) / 800.dp).value, 0.01f)
+    }
+
+    @Test
     fun `a narrow phone gets more than half, rather than crowding the buttons`() {
         // 640dp less a 40dp cutout: half would give each button a 38dp slot, narrower than its icon.
         val available = 600.dp
