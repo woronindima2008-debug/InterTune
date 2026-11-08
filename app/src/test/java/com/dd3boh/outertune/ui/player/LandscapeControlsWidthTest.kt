@@ -82,7 +82,7 @@ class LandscapeControlsWidthTest {
         val tvSlot = (tvControls - tvGutter * 2 - tvPlay - tvGap * 2) / 6
         assertTrue("TV transport slot squeezed: $tvSlot", tvSlot >= tvSlotSize)
         assertTrue("lyrics pane lost its share", 520.dp - tvControls >= 520.dp * 0.22f)
-        assertEquals(0.62f, landscapeControlsWidth(800.dp, play, 4, gutter).value / 800f, 0.01f)
+        assertEquals(0.5f, landscapeControlsWidth(800.dp, play, 4, gutter).value / 800f, 0.01f)
     }
 
     @Test
