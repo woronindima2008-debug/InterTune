@@ -31,6 +31,7 @@ import com.dd3boh.outertune.utils.CardBox
 import android.annotation.SuppressLint
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.focusGroup
 import androidx.compose.foundation.gestures.snapping.rememberSnapFlingBehavior
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -616,7 +617,8 @@ fun HomeScreen(
         val tilesBeside = LocalLandscape.current.active
         LazyColumn(
             state = lazylistState,
-            contentPadding = LocalPlayerAwareWindowInsets.current.asPaddingValues()
+            contentPadding = LocalPlayerAwareWindowInsets.current.asPaddingValues(),
+            modifier = Modifier.focusGroup()
         ) {
             item(key = "tiles", contentType = "tiles") {
                 Row(
