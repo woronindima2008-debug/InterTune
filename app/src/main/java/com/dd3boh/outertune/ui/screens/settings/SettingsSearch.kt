@@ -49,6 +49,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.dd3boh.outertune.R
 import com.dd3boh.outertune.ui.component.PreferenceEntry
+import com.dd3boh.outertune.ui.utils.dpadOverlay
 
 /**
  * The search of Settings: a field over the list, and in the list's place while something is
@@ -92,6 +93,9 @@ internal fun SettingsSearchField(
     Row(
         verticalAlignment = Alignment.CenterVertically,
         modifier = modifier
+            // Treat the settings search as a small floating control so Down can jump
+            // directly to the first visible setting even when Compose focus groups intervene.
+            .dpadOverlay()
             .fillMaxWidth()
             .heightIn(min = 52.dp)
             .clip(CircleShape)
