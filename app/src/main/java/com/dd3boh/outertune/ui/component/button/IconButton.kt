@@ -18,6 +18,7 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.material3.minimumInteractiveComponentSize
 import androidx.compose.material3.LocalContentColor
 import androidx.compose.foundation.shape.CircleShape
+import com.dd3boh.outertune.ui.utils.dpadFocusIndicator
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.background
@@ -67,6 +68,7 @@ fun ResizableIconButton(
             )
             .alpha(if (enabled) 1f else 0.5f)
             .then(modifier)
+            .dpadFocusIndicator(CircleShape)
     )
 }
 
@@ -117,11 +119,12 @@ fun IconButton(
 ) {
     if (onLongClick == null) {
         // Qualified: this function is also called IconButton, and a call that resolved to it would recurse.
-        androidx.compose.material3.IconButton(onClick = onClick, modifier = modifier, enabled = enabled, colors = colors, interactionSource = interactionSource, content = content)
+        androidx.compose.material3.IconButton(onClick = onClick, modifier = modifier.dpadFocusIndicator(CircleShape), enabled = enabled, colors = colors, interactionSource = interactionSource, content = content)
         return
     }
     Box(
         modifier = modifier
+            .dpadFocusIndicator(CircleShape)
             .minimumInteractiveComponentSize()
             .size(40.dp)
             .clip(CircleShape)
