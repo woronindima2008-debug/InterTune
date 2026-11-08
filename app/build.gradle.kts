@@ -180,6 +180,7 @@ android {
             isMinifyEnabled = false
             isShrinkResources = false
             matchingFallbacks += listOf("release")
+            signingConfig = signingConfigs.getByName("debug")
         }
         }
     }
