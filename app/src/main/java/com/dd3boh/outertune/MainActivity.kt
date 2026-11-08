@@ -741,6 +741,16 @@ class MainActivity : ComponentActivity() {
         // The window's compositions keep the app's pace: none with animations off (Animations).
         setContent(parent = Animations.recomposer(this)) {
             Log.v(MAIN_TAG, "RC-1")
+
+            // A TV remote is a keyboard-style input device. Compose can otherwise remain in
+            // touch mode on some TV launchers, leaving keyboard-only focus targets unavailable.
+            val inputModeManager = LocalInputModeManager.current
+            LaunchedEffect(BuildConfig.BUILD_TYPE) {
+                if (BuildConfig.BUILD_TYPE == "tv") {
+                    inputModeManager.requestInputMode(InputMode.Keyboard)
+                }
+            }
+
             val coroutineScope = rememberCoroutineScope()
             val haptic = LocalHapticFeedback.current
             val snackbarHostState = remember { SnackbarHostState() }
