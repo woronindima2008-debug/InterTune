@@ -685,6 +685,14 @@ private fun dpadMove(view: View, direction: DpadDirection?, fromAnywhere: Boolea
  */
 private enum class DpadMove { Moved, NothingThere, Covered, NotOurs }
 
+/**
+ * A scrollable list inside a floating surface (notably search suggestions) keeps its own D-pad
+ * traversal. The TV-wide screen search must not steal those keys; ordinary TV content and the
+ * search field itself still use the screen-wide geometry.
+ */
+internal fun dpadLeavesToCompose(fromAnywhere: Boolean, inOverlay: Boolean, focusedInScroller: Boolean): Boolean =
+    focusedInScroller || (!fromAnywhere && !inOverlay)
+
 private fun moveFromOverlay(root: SemanticsNode, direction: DpadDirection?, fromAnywhere: Boolean): DpadMove {
     val focusables = ArrayList<Focusable>()
     val overlays = ArrayList<Rect>()
@@ -749,7 +757,7 @@ private fun moveFromOverlay(root: SemanticsNode, direction: DpadDirection?, from
         (direction == DpadDirection.Left || direction == DpadDirection.Right) &&
         SemanticsProperties.EditableText in from.node.config
     ) return DpadMove.NotOurs
-    if (!fromAnywhere && (!from.inOverlay || focusedInScroller)) return DpadMove.NotOurs
+    if (dpadLeavesToCompose(fromAnywhere, from.inOverlay, focusedInScroller)) return DpadMove.NotOurs
 
     val candidates = visible.filter { it !== from }
     val targets = dpadTargets(from.bounds, direction, candidates.map { it.bounds })
