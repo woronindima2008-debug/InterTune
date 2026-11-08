@@ -96,6 +96,7 @@ import androidx.compose.ui.util.lerp
 import com.dd3boh.outertune.constants.AppBarHeight
 import com.dd3boh.outertune.constants.BackAnimationsKey
 import com.dd3boh.outertune.utils.rememberPreference
+import com.dd3boh.outertune.ui.utils.dpadOverlay
 import kotlinx.coroutines.launch
 import kotlin.coroutines.cancellation.CancellationException
 import kotlin.math.max
@@ -265,6 +266,9 @@ fun SearchBar(
                     end = endPadding
                 )
                 .size(width = width, height = height)
+                // The closed pill floats above page content; while open, the full-screen search
+                // owns focus and must keep arrows away from controls hidden underneath it.
+                .dpadOverlay()
                 .then(if (glass != null && animationProgress < 1f) Modifier.floatingGlass(glass, animatedShape) else Modifier)
         ) {
             Column {
