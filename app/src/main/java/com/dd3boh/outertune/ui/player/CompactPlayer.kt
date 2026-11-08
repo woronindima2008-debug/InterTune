@@ -185,7 +185,7 @@ internal data class PlayerControlSizes(
  * height the controls do not take goes to the cover, and at 72dp the play button and the gap above
  * it took 84dp of a keypad phone's 355dp. The other icons keep their size.
  */
-internal fun playerControlSizes(landscapePlayer: Boolean, compact: Boolean): PlayerControlSizes = when {
+internal fun playerControlSizes(landscapePlayer: Boolean, compact: Boolean, tvBuild: Boolean = false): PlayerControlSizes = when {
     compact -> PlayerControlSizes(
         playButton = 56.dp,
         playIcon = 28.dp,
@@ -193,6 +193,17 @@ internal fun playerControlSizes(landscapePlayer: Boolean, compact: Boolean): Pla
         pausedCorner = 28.dp,
         transportIcon = 32.dp,
         gapAboveTransport = 4.dp,
+    )
+
+    tvBuild && landscapePlayer -> PlayerControlSizes(
+        // TV remotes need every target fully visible, but the lyrics pane must remain useful too.
+        // Slightly smaller controls and 48dp slots fit six transport actions on a 520dp window.
+        playButton = 72.dp,
+        playIcon = 32.dp,
+        playingCorner = 22.dp,
+        pausedCorner = 32.dp,
+        transportIcon = 36.dp,
+        gapAboveTransport = 8.dp,
     )
 
     landscapePlayer -> PlayerControlSizes(
