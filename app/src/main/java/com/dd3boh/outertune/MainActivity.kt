@@ -1894,7 +1894,7 @@ class MainActivity : ComponentActivity() {
                         Box(
                             modifier = Modifier
                                 .fillMaxSize()
-                                .dpadOverlayEscape()
+                                .dpadOverlayEscape(tvNavigation = BuildConfig.BUILD_TYPE == "tv")
                         ) {
                             Log.v(MAIN_TAG, "RC-3")
 
