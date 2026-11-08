@@ -86,6 +86,16 @@ class LandscapeControlsWidthTest {
     }
 
     @Test
+    fun `TV always gets the landscape player layout below the generic 600dp threshold`() {
+        assertTrue(shouldUseLandscapePlayerLayout(isLandscape = true, tabMode = false, wideScreen = false, tvBuild = true))
+        assertTrue(shouldUseLandscapePlayerLayout(isLandscape = true, tabMode = false, wideScreen = true, tvBuild = true))
+        assertTrue(shouldUseLandscapePlayerLayout(isLandscape = true, tabMode = false, wideScreen = true, tvBuild = false))
+        assertTrue(!shouldUseLandscapePlayerLayout(isLandscape = true, tabMode = false, wideScreen = false, tvBuild = false))
+        assertTrue(!shouldUseLandscapePlayerLayout(isLandscape = false, tabMode = false, wideScreen = true, tvBuild = true))
+        assertTrue(!shouldUseLandscapePlayerLayout(isLandscape = true, tabMode = true, wideScreen = true, tvBuild = true))
+    }
+
+    @Test
     fun `a narrow phone gets more than half, rather than crowding the buttons`() {
         // 640dp less a 40dp cutout: half would give each button a 38dp slot, narrower than its icon.
         val available = 600.dp
