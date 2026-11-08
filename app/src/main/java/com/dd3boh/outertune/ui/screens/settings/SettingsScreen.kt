@@ -11,6 +11,7 @@ package com.dd3boh.outertune.ui.screens.settings
 
 import com.dd3boh.outertune.ui.component.FloatingTopBar
 
+import androidx.compose.foundation.focusGroup
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxHeight
@@ -276,7 +277,10 @@ fun SettingsScreen(
     ColumnWithContentPadding(
         modifier = Modifier.fillMaxHeight(),
         columnModifier = Modifier
-            .padding(horizontal = 16.dp),
+            .padding(horizontal = 16.dp)
+            // Keep D-pad traversal inside the settings content so the vertical scroll can
+            // bring each newly focused preference into view before focus leaves the page.
+            .focusGroup(),
         // Room for the keyboard under the results, so that the last of them can be scrolled
         // above it while typing: the window does not shrink for it, edge to edge.
         contentPadding = LocalPlayerAwareWindowInsets.current.union(WindowInsets.ime),
