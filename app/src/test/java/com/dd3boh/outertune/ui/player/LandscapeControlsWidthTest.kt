@@ -72,7 +72,7 @@ class LandscapeControlsWidthTest {
         val tvControls = landscapeControlsWidth(520.dp, play, 6, 16.dp, maxControlsFraction = 0.78f)
         val tvSlot = (tvControls - 32.dp - play - 16.dp) / 6
         assertTrue("TV transport icon squeezed: $tvSlot", tvSlot >= icon)
-        assertEquals(0.62f, (landscapeControlsWidth(800.dp, play, 4, gutter) / 800.dp).value, 0.01f)
+        assertEquals(0.62f, landscapeControlsWidth(800.dp, play, 4, gutter).value / 800f, 0.01f)
     }
 
     @Test
