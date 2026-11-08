@@ -526,13 +526,33 @@ private class Focusable(val node: SemanticsNode, val bounds: Rect, val overlay: 
  * [dpadWrapsToTabs]), as it does from the topmost floating controls. From one that covers the
  * screen, Up with nothing above is taken and goes nowhere (see [dpadCoversScreen]).
  */
-fun Modifier.dpadOverlayEscape(): Modifier = composed {
+fun Modifier.dpadOverlayEscape(tvNavigation: Boolean = false): Modifier = composed {
     val view = LocalView.current
     val focusManager = LocalFocusManager.current
     val anythingFocused = remember { BooleanArray(1) }
     onFocusEvent { anythingFocused[0] = it.hasFocus }.onPreviewKeyEvent { event ->
         if (event.type != KeyEventType.KeyDown) return@onPreviewKeyEvent false
         val direction = event.dpadDirection() ?: return@onPreviewKeyEvent false
+        // On TV, do not leave navigation to Compose's focus tree alone. Its grouping of a
+        // navigation rail, lazy lists and floating sheets can make the nearest visible control
+        // look like it is outside the current group, so Down stays in the rail or stops at a
+        // search field. Search the visible screen for every D-pad direction instead.
+        if (tvNavigation) {
+            val owner = (view as? RootForTest)?.semanticsOwner ?: return@onPreviewKeyEvent false
+            if ((direction == DpadDirection.Up || direction == DpadDirection.Down) &&
+                scrollListInstead(view, direction)
+            ) return@onPreviewKeyEvent true
+            return@onPreviewKeyEvent when (
+                moveFromOverlay(owner.unmergedRootSemanticsNode, direction, fromAnywhere = true)
+            ) {
+                DpadMove.Moved -> true
+                DpadMove.NotOurs -> false
+                DpadMove.NothingThere ->
+                    dpadWrapsToTabs(direction, moved = false, redirected = false) && focusTabBar(view)
+                // Do not let focus fall through to a control hidden by a full-screen sheet.
+                DpadMove.Covered -> direction == DpadDirection.Up
+            }
+        }
         if (!needsScreenSearch(anythingFocused[0], overlaysFocused.get())) return@onPreviewKeyEvent false
         val owner = (view as? RootForTest)?.semanticsOwner ?: return@onPreviewKeyEvent false
         when (moveFromOverlay(owner.unmergedRootSemanticsNode, direction, fromAnywhere = false)) {
@@ -723,6 +743,12 @@ private fun moveFromOverlay(root: SemanticsNode, direction: DpadDirection?, from
         return if (first?.requestFocus() == true) DpadMove.Moved else DpadMove.NothingThere
     }
     if (direction == null) return DpadMove.NotOurs
+    // Arrow keys inside a text field still edit its text horizontally; TV's global search only
+    // takes horizontal arrows when the focused control is not editable.
+    if (fromAnywhere &&
+        (direction == DpadDirection.Left || direction == DpadDirection.Right) &&
+        SemanticsProperties.EditableText in from.node.config
+    ) return DpadMove.NotOurs
     if (!fromAnywhere && (!from.inOverlay || focusedInScroller)) return DpadMove.NotOurs
 
     val candidates = visible.filter { it !== from }
