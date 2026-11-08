@@ -33,7 +33,7 @@ jobs:
         run: yes | /usr/local/lib/android/sdk/cmdline-tools/latest/bin/sdkmanager --licenses
 
       - name: Build Android TV APK
-        run: ./gradlew assembleCoreTv --stacktrace -DskipFormatKtlint
+        run: ./gradlew testCoreTvUnitTest assembleCoreTv --stacktrace -DskipFormatKtlint
 
       - name: Upload Android TV APK
         uses: actions/upload-artifact@v4
