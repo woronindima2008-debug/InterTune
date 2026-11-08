@@ -22,6 +22,7 @@ import com.dd3boh.outertune.ui.utils.LocalAppBackdrop
 import com.dd3boh.outertune.ui.utils.LocalGlassStill
 import com.dd3boh.outertune.ui.utils.stillGlass
 import com.dd3boh.outertune.ui.utils.dpadOverlay
+import com.dd3boh.outertune.ui.utils.dpadFocusIndicator
 import com.dd3boh.outertune.ui.utils.LocalLandscape
 import com.dd3boh.outertune.ui.utils.CoverBlur
 import com.kyant.backdrop.effects.vibrancy
@@ -2400,6 +2401,7 @@ private fun PlayerCircleButton(
             .clip(CircleShape)
             .background(container)
             .clickable(onClick = onClick)
+            .dpadFocusIndicator(CircleShape)
     ) {
         Icon(
             painter = painter,
@@ -2460,6 +2462,7 @@ private fun PlayerActionSegment(
                 else Modifier.background(container)
             )
             .clickable(onClick = onClick)
+            .dpadFocusIndicator(shape)
             .padding(horizontal = 10.dp)
     ) {
         Icon(
