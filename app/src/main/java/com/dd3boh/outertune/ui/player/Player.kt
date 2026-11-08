@@ -521,6 +521,9 @@ fun BottomSheetPlayer(
     }
 
     val isLandscape = LocalConfiguration.current.orientation == Configuration.ORIENTATION_LANDSCAPE
+    // TV screens are viewed from a distance and need a wider control lane so every remote target
+    // stays visible beside lyrics, including when the optional seek buttons are enabled.
+    val tvBuild = com.dd3boh.outertune.BuildConfig.BUILD_TYPE == "tv"
     val tabMode = rememberTabMode()
     val wideScreen = context.supportsWideScreen()
 
@@ -923,6 +926,7 @@ fun BottomSheetPlayer(
             val landscapePlayer = isLandscape && !tabMode
             val hPadding = when {
                 compactPlayer -> CompactPlayerGutter
+                landscapePlayer && tvBuild -> 16.dp
                 landscapePlayer -> 24.dp
                 else -> PlayerHorizontalPadding
             }
@@ -1684,6 +1688,7 @@ fun BottomSheetPlayer(
                     playButton = playButtonSize,
                     slots = if (seekIncrement != SeekIncrement.OFF) 6 else 4,
                     gutter = hPadding,
+                    maxControlsFraction = if (tvBuild) 0.78f else 0.62f,
                 )
                 Row(modifier = Modifier.fillMaxSize()) {
                     // The queue sheet's peek is reserved on the controls column alone, not on this
@@ -2073,9 +2078,16 @@ private val LandscapeTransportSlot = 56.dp
  *
  * Lyrics play no part in it, so the controls are the same with them on or off.
  */
-internal fun landscapeControlsWidth(available: Dp, playButton: Dp, slots: Int, gutter: Dp): Dp {
+internal fun landscapeControlsWidth(
+    available: Dp,
+    playButton: Dp,
+    slots: Int,
+    gutter: Dp,
+    maxControlsFraction: Float = 0.62f,
+): Dp {
     val needed = LandscapeTransportSlot * slots + playButton + PlayButtonGap * 2 + gutter * 2
-    return (available / 2).coerceAtLeast(needed).coerceAtMost(available * 0.62f)
+    val maxFraction = maxControlsFraction.coerceIn(0.5f, 0.9f)
+    return (available / 2).coerceAtLeast(needed).coerceAtMost(available * maxFraction)
 }
 
 /**
