@@ -66,12 +66,22 @@ class LandscapeControlsWidthTest {
     }
 
     @Test
-    fun `TV gives the transport row more room without changing phone sizing`() {
-        // Six-button playback on a 520dp TV window keeps its 42dp icons visible; the artwork
-        // yields width on TV rather than clipping the outer transport buttons.
-        val tvControls = landscapeControlsWidth(520.dp, play, 6, 16.dp, maxControlsFraction = 0.78f)
-        val tvSlot = (tvControls - 32.dp - play - 16.dp) / 6
-        assertTrue("TV transport icon squeezed: $tvSlot", tvSlot >= icon)
+    fun `TV keeps six remote transport targets inside their slots beside lyrics`() {
+        // TV uses a 72dp play target, 36dp transport icons in 48dp slots, 12dp side gutters
+        // and 6dp gaps. This fits a six-button row in 520dp without squeezing the icons.
+        val tvPlay = 72.dp
+        val tvGutter = 12.dp
+        val tvSlotSize = 48.dp
+        val tvGap = 6.dp
+        val tvControls = landscapeControlsWidth(
+            520.dp, tvPlay, 6, tvGutter,
+            maxControlsFraction = 0.78f,
+            slot = tvSlotSize,
+            playButtonGap = tvGap,
+        )
+        val tvSlot = (tvControls - tvGutter * 2 - tvPlay - tvGap * 2) / 6
+        assertTrue("TV transport slot squeezed: $tvSlot", tvSlot >= tvSlotSize)
+        assertTrue("lyrics pane lost its share", 520.dp - tvControls >= 520.dp * 0.22f)
         assertEquals(0.62f, landscapeControlsWidth(800.dp, play, 4, gutter).value / 800f, 0.01f)
     }
 
