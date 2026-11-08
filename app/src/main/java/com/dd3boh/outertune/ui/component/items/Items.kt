@@ -145,16 +145,19 @@ inline fun ListItem(
                         if (isSelected == true) MaterialTheme.colorScheme.primary.copy(alpha = 0.4f)
                         else MaterialTheme.colorScheme.secondaryContainer
                 )
+                .dpadFocusIndicator(RoundedCornerShape(8.dp))
         } else if (isSelected == true) {
             modifier // inactive selected
                 .height(ListItemHeight)
                 .padding(horizontal = 8.dp)
                 .clip(RoundedCornerShape(8.dp))
                 .background(color = MaterialTheme.colorScheme.inversePrimary.copy(alpha = 0.4f))
+                .dpadFocusIndicator(RoundedCornerShape(8.dp))
         } else {
             modifier // default
                 .height(ListItemHeight)
                 .padding(horizontal = 8.dp)
+                .dpadFocusIndicator(RoundedCornerShape(8.dp))
         }
     ) {
         Box(
@@ -256,10 +259,12 @@ fun GridItem(
             modifier
                 .padding(12.dp)
                 .fillMaxWidth()
+                .dpadFocusIndicator(RoundedCornerShape(12.dp))
         } else {
             modifier
                 .padding(12.dp)
                 .width(GridThumbnailHeight * thumbnailRatio)
+                .dpadFocusIndicator(RoundedCornerShape(12.dp))
         }
     ) {
         BoxWithConstraints(
