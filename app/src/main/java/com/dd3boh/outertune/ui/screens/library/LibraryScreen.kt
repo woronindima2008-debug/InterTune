@@ -3,6 +3,7 @@ package com.dd3boh.outertune.ui.screens.library
 import com.dd3boh.outertune.ui.component.ScreenBackHandler
 import android.content.pm.PackageManager
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.focusGroup
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -363,7 +364,8 @@ fun LibraryScreen(
                     LibraryViewType.LIST -> {
                         LazyColumn(
                             state = lazyListState,
-                            contentPadding = LocalPlayerAwareWindowInsets.current.asPaddingValues()
+                            contentPadding = LocalPlayerAwareWindowInsets.current.asPaddingValues(),
+                            modifier = Modifier.focusGroup()
                         ) {
                             item(
                                 key = "filter",
@@ -519,7 +521,8 @@ fun LibraryScreen(
                         LazyVerticalGrid(
                             state = lazyGridState,
                             columns = GridCells.Adaptive(minSize = GridThumbnailHeight + 24.dp),
-                            contentPadding = LocalPlayerAwareWindowInsets.current.asPaddingValues()
+                            contentPadding = LocalPlayerAwareWindowInsets.current.asPaddingValues(),
+                            modifier = Modifier.focusGroup()
                         ) {
                             item(
                                 key = "filter",
