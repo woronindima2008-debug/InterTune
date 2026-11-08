@@ -2187,10 +2187,14 @@ class MainActivity : ComponentActivity() {
                                     // top of the open player, and swallowed every tap on its left strip.
                                     modifier = Modifier
                                         .align(alignment)
-                                        // Treat the TV side rail as an overlay for D-pad focus search:
-                                        // Right from a selected navigation item must reach the page
-                                        // content, rather than continuing down the rail to its last item.
-                                        .dpadOverlay()
+                                        // On TV, do not mark the rail as a floating overlay: the root
+                                        // D-pad handler must try Compose's native focus traversal first,
+                                        // so Right can leave the rail and enter the destination's content.
+                                        // The screen-wide geometry search remains its fallback.
+                                        .then(
+                                            if (BuildConfig.BUILD_TYPE == "tv") Modifier
+                                            else Modifier.dpadOverlay()
+                                        )
                                         .blockFocusWhen(screenCovered)
                                         .fillMaxHeight()
                                         .offset {
