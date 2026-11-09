@@ -755,7 +755,7 @@ class BinauralAudioProcessorTest {
     @Test
     fun `six channels and eight come out as two, at the same rate`() {
         for (channels in listOf(6, 8)) for (rate in listOf(44100, 48000)) {
-            val p = BinauralAudioProcessor().apply { enabled = true; thirdOrder = false }
+            val p = BinauralAudioProcessor(surroundEnabled = true).apply { enabled = true; thirdOrder = false }
             val out = p.configure(surroundFloat(channels, rate))
             assertEquals("$channels in", 2, out.channelCount)
             assertEquals(rate, out.sampleRate)
@@ -853,7 +853,7 @@ class BinauralAudioProcessorTest {
 
     @Test
     fun `sixteen bit surround comes out as sixteen bit for two ears`() {
-        val p = BinauralAudioProcessor().apply { enabled = true; thirdOrder = false }
+        val p = BinauralAudioProcessor(surroundEnabled = true).apply { enabled = true; thirdOrder = false }
         val out = p.configure(AudioProcessor.AudioFormat(48000, 6, C.ENCODING_PCM_16BIT))
         assertEquals(2, out.channelCount)
         assertEquals(C.ENCODING_PCM_16BIT, out.encoding)
