@@ -1,5 +1,6 @@
 package com.dd3boh.outertune.ui.menu
 
+import com.dd3boh.outertune.ui.utils.dpadFocusIndicator
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.asPaddingValues
@@ -325,7 +326,8 @@ fun SelectionMediaMetadataMenu(
             },
             buttons = {
                 TextButton(
-                    onClick = {
+                    modifier = Modifier.dpadFocusIndicator(),
+onClick = {
                         showRemoveDownloadDialog = false
                     }
                 ) {
@@ -333,7 +335,8 @@ fun SelectionMediaMetadataMenu(
                 }
 
                 TextButton(
-                    onClick = {
+                    modifier = Modifier.dpadFocusIndicator(),
+onClick = {
                         showRemoveDownloadDialog = false
                         selection.forEach { song ->
                             downloadUtil.removeDownload(song.id)

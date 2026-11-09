@@ -1,5 +1,6 @@
 package com.dd3boh.outertune.ui.menu
 
+import com.dd3boh.outertune.ui.utils.dpadFocusIndicator
 import android.app.SearchManager
 import android.content.ClipData
 import android.content.ClipboardManager
@@ -200,7 +201,8 @@ fun LyricsMenu(
             title = { Text(stringResource(R.string.search_lyrics)) },
             buttons = {
                 TextButton(
-                    onClick = { showSearchDialog = false }
+                    modifier = Modifier.dpadFocusIndicator(),
+onClick = { showSearchDialog = false }
                 ) {
                     Text(stringResource(android.R.string.cancel))
                 }
@@ -208,7 +210,8 @@ fun LyricsMenu(
                 Spacer(Modifier.width(8.dp))
 
                 TextButton(
-                    onClick = {
+                    modifier = Modifier.dpadFocusIndicator(),
+onClick = {
                         showSearchDialog = false
                         onDismiss()
                         try {
@@ -227,7 +230,8 @@ fun LyricsMenu(
                 Spacer(Modifier.width(8.dp))
 
                 TextButton(
-                    onClick = {
+                    modifier = Modifier.dpadFocusIndicator(),
+onClick = {
                         viewModel.search(
                             searchMediaMetadata.id,
                             titleField.text,
@@ -385,7 +389,8 @@ fun LyricsMenu(
             },
             buttons = {
                 TextButton(
-                    onClick = {
+                    modifier = Modifier.dpadFocusIndicator(),
+onClick = {
                         showDeleteLyric = false
                     }
                 ) {
@@ -393,7 +398,8 @@ fun LyricsMenu(
                 }
 
                 TextButton(
-                    onClick = {
+                    modifier = Modifier.dpadFocusIndicator(),
+onClick = {
                         showDeleteLyric = false
                         onDismiss()
 
@@ -449,7 +455,8 @@ fun LyricsMenu(
             },
             buttons = {
                 TextButton(
-                    onClick = {
+                    modifier = Modifier.dpadFocusIndicator(),
+onClick = {
                         showSettings = false
                     }
                 ) {

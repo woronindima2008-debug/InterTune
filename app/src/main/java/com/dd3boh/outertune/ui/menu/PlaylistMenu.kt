@@ -1,5 +1,6 @@
 package com.dd3boh.outertune.ui.menu
 
+import com.dd3boh.outertune.ui.utils.dpadFocusIndicator
 import android.content.Intent
 import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -349,7 +350,8 @@ fun PlaylistMenu(
             },
             buttons = {
                 TextButton(
-                    onClick = {
+                    modifier = Modifier.dpadFocusIndicator(),
+onClick = {
                         showRemoveDownloadDialog = false
                     }
                 ) {
@@ -357,7 +359,8 @@ fun PlaylistMenu(
                 }
 
                 TextButton(
-                    onClick = {
+                    modifier = Modifier.dpadFocusIndicator(),
+onClick = {
                         showRemoveDownloadDialog = false
                         songs.forEach { song ->
                             downloadUtil.removeDownload(song.song.id)
@@ -382,7 +385,8 @@ fun PlaylistMenu(
             },
             buttons = {
                 TextButton(
-                    onClick = {
+                    modifier = Modifier.dpadFocusIndicator(),
+onClick = {
                         showDeletePlaylistDialog = false
                     }
                 ) {
@@ -390,7 +394,8 @@ fun PlaylistMenu(
                 }
 
                 TextButton(
-                    onClick = {
+                    modifier = Modifier.dpadFocusIndicator(),
+onClick = {
                         showDeletePlaylistDialog = false
                         onDismiss()
                         val files = context.filesDir

@@ -1,5 +1,6 @@
 package com.dd3boh.outertune.ui.menu
 
+import com.dd3boh.outertune.ui.utils.dpadFocusIndicator
 import com.dd3boh.outertune.ui.component.rememberSleepTimerState
 import com.dd3boh.outertune.ui.component.SleepTimerDialog
 import com.dd3boh.outertune.constants.Unreleased
@@ -523,7 +524,8 @@ fun PitchTempoDialog(
         onDismissRequest = onDismiss,
         dismissButton = {
             TextButton(
-                onClick = {
+                modifier = Modifier.dpadFocusIndicator(),
+onClick = {
                     tempo = 1f
                     transposeValue = 0
                     updatePlaybackParameters()
@@ -534,7 +536,8 @@ fun PitchTempoDialog(
         },
         confirmButton = {
             TextButton(
-                onClick = onDismiss
+                modifier = Modifier.dpadFocusIndicator(),
+onClick = onDismiss
             ) {
                 Text(stringResource(android.R.string.ok))
             }

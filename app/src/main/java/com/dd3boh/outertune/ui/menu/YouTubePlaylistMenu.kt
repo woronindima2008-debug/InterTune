@@ -1,5 +1,6 @@
 package com.dd3boh.outertune.ui.menu
 
+import com.dd3boh.outertune.ui.utils.dpadFocusIndicator
 import android.content.Intent
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.WindowInsets
@@ -366,7 +367,8 @@ fun YouTubePlaylistMenu(
             },
             buttons = {
                 TextButton(
-                    onClick = {
+                    modifier = Modifier.dpadFocusIndicator(),
+onClick = {
                         showRemoveDownloadDialog = false
                     }
                 ) {
@@ -374,7 +376,8 @@ fun YouTubePlaylistMenu(
                 }
 
                 TextButton(
-                    onClick = {
+                    modifier = Modifier.dpadFocusIndicator(),
+onClick = {
                         showRemoveDownloadDialog = false
                         songs.forEach { song ->
                             downloadUtil.removeDownload(song.id)
@@ -399,7 +402,8 @@ fun YouTubePlaylistMenu(
             },
             buttons = {
                 TextButton(
-                    onClick = {
+                    modifier = Modifier.dpadFocusIndicator(),
+onClick = {
                         showDeletePlaylistDialog = false
                     }
                 ) {
@@ -407,7 +411,8 @@ fun YouTubePlaylistMenu(
                 }
 
                 TextButton(
-                    onClick = {
+                    modifier = Modifier.dpadFocusIndicator(),
+onClick = {
                         showDeletePlaylistDialog = false
                         onDismiss()
                         // What the library's own Delete does. This used to delete by the YouTube
