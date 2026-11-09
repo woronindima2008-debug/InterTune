@@ -1971,15 +1971,20 @@ class MainActivity : ComponentActivity() {
                                 searchActive || tvRemoteCursor.enabled || navBackStackEntry == null
                             ) return@LaunchedEffect
 
-                            kotlinx.coroutines.delay(350L)
-                            withFrameNanos { }
-                            // Do not steal focus if the user has already started navigating
-                            // during the delay above.
-                            if (!tvRemoteCursor.hasFocusTarget()) {
+                            // A destination can still be entering or its first lazy row may
+                            // not be attached after a single transition delay. Retry focus until
+                            // Compose exposes a real target, as TV navigation must never start
+                            // with an unfocused screen. Stop immediately if the user has already
+                            // acquired focus; never steal it during these retries.
+                            for (attempt in 0 until 25) {
+                                if (tvRemoteCursor.hasFocusTarget()) break
                                 val tabFocused = if (onTabRoot) {
                                     runCatching { selectedTabFocus.requestFocus() }.getOrDefault(false)
                                 } else false
-                                if (!tabFocused) tvRemoteCursor.focusFirstTarget()
+                                val contentFocused = tabFocused || tvRemoteCursor.focusFirstTarget()
+                                if (contentFocused) break
+                                withFrameNanos { }
+                                kotlinx.coroutines.delay(60L)
                             }
                         }
 
