@@ -556,9 +556,15 @@ fun Modifier.dpadOverlayEscape(
                     // the animation to finish matters: during it, suggestion rows are still
                     // composed and can win the geometric search ahead of the page content.
                     kotlinx.coroutines.delay(320L)
-                    withFrameNanos { }
-                    if (!moveDpadFocusFromAnywhere(view, DpadDirection.Down)) {
-                        focusManager.moveFocus(FocusDirection.Down)
+                    // The overlay animation and the destination's first layout can finish
+                    // on different frames. Retry the transfer instead of making one geometric
+                    // guess while the page is still composing.
+                    repeat(10) {
+                        withFrameNanos { }
+                        if (moveDpadFocusFromAnywhere(view, DpadDirection.Down) ||
+                            focusManager.moveFocus(FocusDirection.Down)
+                        ) return@launch
+                        kotlinx.coroutines.delay(50L)
                     }
                 }
                 return@onPreviewKeyEvent true
