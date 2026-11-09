@@ -192,12 +192,14 @@ class DpadNavigationInstrumentedTest {
 
         composeRule.waitForIdle()
         composeRule.onNodeWithTag("overlay-action").assertIsFocused()
-        composeRule.onNodeWithTag("overlay-action").performKeyInput {
-            keyDown(Key.DirectionDown)
-            keyUp(Key.DirectionDown)
+        for (key in listOf(Key.DirectionUp, Key.DirectionDown, Key.DirectionLeft, Key.DirectionRight)) {
+            composeRule.onNodeWithTag("overlay-action").performKeyInput {
+                keyDown(key)
+                keyUp(key)
+            }
+            composeRule.waitForIdle()
+            composeRule.onNodeWithTag("overlay-action").assertIsFocused()
+            composeRule.onNodeWithTag("covered-content").assertIsNotFocused()
         }
-        composeRule.waitForIdle()
-        composeRule.onNodeWithTag("overlay-action").assertIsFocused()
-        composeRule.onNodeWithTag("covered-content").assertIsNotFocused()
     }
 }
