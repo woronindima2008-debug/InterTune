@@ -38,6 +38,10 @@ internal class DoubleCenterPressDetector(
 ) {
     private var lastPressAt = Long.MIN_VALUE
 
+    fun reset() {
+        lastPressAt = Long.MIN_VALUE
+    }
+
     fun onPress(nowMs: Long): Boolean {
         val elapsed = nowMs - lastPressAt
         if (lastPressAt != Long.MIN_VALUE && elapsed in 0..windowMs) {

@@ -27,6 +27,15 @@ class TvRemoteCursorTest {
     }
 
     @Test
+    fun `an intervening key resets the pending center press`() {
+        val detector = DoubleCenterPressDetector(windowMs = 600L)
+        assertFalse(detector.onPress(1_000L))
+        detector.reset()
+        assertFalse(detector.onPress(1_200L))
+        assertTrue(detector.onPress(1_300L))
+    }
+
+    @Test
     fun `press after window starts a new pair`() {
         val detector = DoubleCenterPressDetector(windowMs = 600L)
         assertFalse(detector.onPress(1_000L))

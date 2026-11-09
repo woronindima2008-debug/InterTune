@@ -495,6 +495,13 @@ class MainActivity : ComponentActivity() {
             event.keyCode == KeyEvent.KEYCODE_ENTER ||
             event.keyCode == KeyEvent.KEYCODE_NUMPAD_ENTER
 
+        // A double-OK shortcut means two consecutive OK presses. An arrow, Back, or any other
+        // physical key between them must cancel the pending first press; otherwise a later OK
+        // can unexpectedly switch pointer mode instead of activating the focused control.
+        if (!isCenterKey && event.action == KeyEvent.ACTION_DOWN) {
+            remoteCenterPressDetector.reset()
+        }
+
         // The first OK remains a normal click/activation. A second OK within 600 ms toggles the
         // pointer; consume that second key-up too, so it cannot activate the focused control.
         if (isCenterKey && event.action == KeyEvent.ACTION_UP && consumeRemoteCenterKeyUp) {
