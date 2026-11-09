@@ -2427,8 +2427,8 @@ private fun PlayerCircleButton(
             .size(36.dp)
             .clip(CircleShape)
             .background(container)
-            .clickable(onClick = onClick)
             .dpadFocusIndicator(CircleShape)
+            .clickable(onClick = onClick)
     ) {
         Icon(
             painter = painter,
@@ -2488,8 +2488,8 @@ private fun PlayerActionSegment(
                     )
                 else Modifier.background(container)
             )
-            .clickable(onClick = onClick)
             .dpadFocusIndicator(shape)
+            .clickable(onClick = onClick)
             .padding(horizontal = 10.dp)
     ) {
         Icon(

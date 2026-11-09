@@ -48,14 +48,16 @@ fun PreferenceEntry(
 ) {
     Row(
         verticalAlignment = Alignment.CenterVertically,
-        modifier = modifier
+        modifier = Modifier
+            // Observe focus from the clickable/toggleable modifier supplied below.
+            .dpadFocusIndicator(RoundedCornerShape(12.dp))
+            .then(modifier)
             .fillMaxWidth()
             .then(
                 if (onClick != null) Modifier.clickable(enabled = isEnabled, onClick = onClick)
                 else Modifier
             )
             .alpha(if (isEnabled) 1f else 0.5f)
-            .dpadFocusIndicator(RoundedCornerShape(12.dp))
             .padding(horizontal = 16.dp, vertical = 16.dp)
     ) {
         if (icon != null) {
@@ -127,11 +129,11 @@ fun <T> ListPreference(
                     verticalAlignment = if (valueDescription != null) Alignment.Top else Alignment.CenterVertically,
                     modifier = Modifier
                         .fillMaxWidth()
+                         .dpadFocusIndicator(RoundedCornerShape(10.dp))
                         .clickable(enabled = !isDisabled) {
                             showDialog = false
                             onValueSelected(value)
                         }
-                        .dpadFocusIndicator(RoundedCornerShape(10.dp))
                         .padding(horizontal = 16.dp, vertical = 12.dp)
                 ) {
                     RadioButton(

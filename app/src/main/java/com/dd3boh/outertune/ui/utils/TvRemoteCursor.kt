@@ -15,6 +15,8 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.composed
+import androidx.compose.ui.input.InputMode
+import androidx.compose.ui.input.InputModeManager
 import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
@@ -22,6 +24,7 @@ import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalInputModeManager
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
@@ -59,13 +62,23 @@ class TvRemoteCursorState {
         private set
 
     private var targetView: View? = null
+    private var inputModeManager: InputModeManager? = null
 
-    fun attach(view: View) {
+    fun attach(view: View, inputModeManager: InputModeManager) {
         targetView = view
+        this.inputModeManager = inputModeManager
     }
 
     fun detach(view: View) {
-        if (targetView === view) targetView = null
+        if (targetView === view) {
+            targetView = null
+            inputModeManager = null
+        }
+    }
+
+    /** Keep TV remote navigation in keyboard mode after synthetic pointer input. */
+    fun requestKeyboardMode() {
+        inputModeManager?.requestInputMode(InputMode.Keyboard)
     }
 
     /** Restores a usable Compose focus target when navigation has left the screen unfocused. */
@@ -73,6 +86,7 @@ class TvRemoteCursorState {
 
     fun toggle() {
         enabled = !enabled
+        if (!enabled) requestKeyboardMode()
     }
 
     fun onKeyEvent(event: KeyEvent): Boolean {
@@ -139,12 +153,13 @@ class TvRemoteCursorState {
  */
 fun Modifier.tvRemoteCursor(cursor: TvRemoteCursorState): Modifier = composed {
     val view = LocalView.current
+    val inputModeManager = LocalInputModeManager.current
     val density = LocalDensity.current
     val pointerWidth = with(density) { 28.dp.toPx() }
     val pointerHeight = with(density) { 42.dp.toPx() }
 
-    androidx.compose.runtime.DisposableEffect(view) {
-        cursor.attach(view)
+    androidx.compose.runtime.DisposableEffect(view, inputModeManager) {
+        cursor.attach(view, inputModeManager)
         onDispose { cursor.detach(view) }
     }
 

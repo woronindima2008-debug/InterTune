@@ -482,6 +482,14 @@ class MainActivity : ComponentActivity() {
     override fun dispatchKeyEvent(event: KeyEvent): Boolean {
         if (BuildConfig.BUILD_TYPE != "tv") return super.dispatchKeyEvent(event)
 
+        // Cursor clicks are synthesized as touch events, which switches Compose to touch mode.
+        // Restore keyboard mode whenever the physical remote is used outside pointer mode.
+        if (!tvRemoteCursor.enabled && event.action == KeyEvent.ACTION_DOWN) {
+            tvRemoteCursor.requestKeyboardMode()
+        } else if (event.keyCode == KeyEvent.KEYCODE_BACK && event.action == KeyEvent.ACTION_DOWN) {
+            tvRemoteCursor.requestKeyboardMode()
+        }
+
         val isCenterKey = event.keyCode == KeyEvent.KEYCODE_DPAD_CENTER ||
             event.keyCode == KeyEvent.KEYCODE_ENTER ||
             event.keyCode == KeyEvent.KEYCODE_NUMPAD_ENTER
@@ -1950,9 +1958,9 @@ class MainActivity : ComponentActivity() {
                         // transition settles, focus the selected tab on a tab root or the first
                         // visible control on a detail/settings page. The Activity retries on the
                         // first arrow key if a screen is still composing.
-                        LaunchedEffect(navBackStackEntry?.id, searchActive, oobeStatus, onTabRoot) {
+                        LaunchedEffect(navBackStackEntry?.id, searchActive, oobeStatus, onTabRoot, tvRemoteCursor.enabled) {
                             if (BuildConfig.BUILD_TYPE != "tv" || oobeStatus < OOBE_VERSION ||
-                                searchActive || navBackStackEntry == null
+                                searchActive || tvRemoteCursor.enabled || navBackStackEntry == null
                             ) return@LaunchedEffect
 
                             kotlinx.coroutines.delay(350L)
