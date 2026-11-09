@@ -133,7 +133,7 @@ class ReleasedFlagsTest {
         // Not while the developer's switch asks the same client first, which is in no release,
         // and only in a build with the solver's two files, which are in every build.
         assertWritten("utils/YTPlayerUtils.kt", "val webInChain = Unreleased.WEB_FALLBACK && !trialOn && wire.canSolve()")
-        assertWritten("utils/YTPlayerUtils.kt", "val trialOn = Unreleased.WEB_CLIENT_FIRST && askWebClientFirst")
+        assertWritten("utils/YTPlayerUtils.kt", "val trialOn = (webClientFirstEnabledOverride ?: Unreleased.WEB_CLIENT_FIRST) && askWebClientFirst")
         assertWritten("utils/YTPlayerUtils.kt", "if (!Unreleased.WEB_FALLBACK || !solverIsInThisBuild) return")
         for (asset in listOf("yt.solver.lib.js", "yt.solver.core.js")) {
             assertTrue("$asset is not in the build", File("src/main/assets/solver/$asset").isFile)
