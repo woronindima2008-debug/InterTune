@@ -103,6 +103,7 @@ import com.dd3boh.outertune.constants.BackAnimationsKey
 import com.dd3boh.outertune.utils.rememberPreference
 import com.dd3boh.outertune.ui.utils.DpadDirection
 import com.dd3boh.outertune.ui.utils.dpadOverlay
+import com.dd3boh.outertune.ui.utils.dpadFocusIndicator
 import com.dd3boh.outertune.ui.utils.moveDpadFocusFromAnywhere
 import kotlinx.coroutines.launch
 import kotlin.coroutines.cancellation.CancellationException
@@ -390,6 +391,7 @@ private fun SearchBarInputField(
             modifier = Modifier
                 .weight(1f)
                 .focusRequester(focusRequester)
+                .dpadFocusIndicator()
                 .pointerInput(Unit) {
                     awaitEachGesture {
                         // Must be PointerEventPass.Initial to observe events before the text field
@@ -418,9 +420,14 @@ private fun SearchBarInputField(
                             // The full-screen suggestions remain composed during the 300 ms
                             // close animation. Let them leave before searching the page below.
                             kotlinx.coroutines.delay(320L)
-                            withFrameNanos { }
-                            if (!moveDpadFocusFromAnywhere(view, DpadDirection.Down)) {
-                                focusManager.moveFocus(FocusDirection.Down)
+                            // Search suggestions and the destination can finish composing on
+                            // different frames. Retry the move until the page exposes a target.
+                            repeat(10) {
+                                withFrameNanos { }
+                                if (moveDpadFocusFromAnywhere(view, DpadDirection.Down) ||
+                                    focusManager.moveFocus(FocusDirection.Down)
+                                ) return@launch
+                                kotlinx.coroutines.delay(50L)
                             }
                         }
                         true
