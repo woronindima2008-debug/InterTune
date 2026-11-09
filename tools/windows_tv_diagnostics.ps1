@@ -1,7 +1,7 @@
 param(
     [string]$Serial = "192.168.0.103:5555",
     [string]$AdbPath = "",
-    [string]$PackageName = "com.dd3boh.outertune"
+    [string]$PackageName = "com.dd3boh.outertune.tv"
 )
 $ErrorActionPreference = "Stop"
 $Repo = "woronindima2008-debug/InterTune"
