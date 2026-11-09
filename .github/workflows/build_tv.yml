@@ -2,7 +2,7 @@ name: Build Android TV APK
 
 concurrency:
   group: android-tv-${{ github.ref }}
-  cancel-in-progress: false
+  cancel-in-progress: true
 
 on:
   workflow_dispatch:
