@@ -1958,7 +1958,7 @@ class MainActivity : ComponentActivity() {
                         // transition settles, focus the selected tab on a tab root or the first
                         // visible control on a detail/settings page. The Activity retries on the
                         // first arrow key if a screen is still composing.
-                        LaunchedEffect(navBackStackEntry?.id, searchActive, oobeStatus, onTabRoot, tvRemoteCursor.enabled) {
+                        LaunchedEffect(navBackStackEntry?.id, oobeStatus, onTabRoot) {
                             if (BuildConfig.BUILD_TYPE != "tv" || oobeStatus < OOBE_VERSION ||
                                 searchActive || tvRemoteCursor.enabled || navBackStackEntry == null
                             ) return@LaunchedEffect
