@@ -13,10 +13,11 @@ import com.dd3boh.outertune.constants.AutoBlockerBlockedByKey
 import com.dd3boh.outertune.constants.AutoBlockerReturnAtKey
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
-import kotlinx.coroutines.cancel
+import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
@@ -41,16 +42,20 @@ class AutoBlockerReturnTest {
     @get:Rule
     val dir = TemporaryFolder()
 
-    private val scopes = mutableListOf<CoroutineScope>()
+    private val storeJobs = mutableListOf<Job>()
 
     /** A store on the one file, as the app's settings are. */
     private fun store(): DataStore<Preferences> {
-        val scope = CoroutineScope(Dispatchers.IO + SupervisorJob()).also { scopes += it }
+        val job = SupervisorJob().also { storeJobs += it }
+        val scope = CoroutineScope(Dispatchers.IO + job)
         return PreferenceDataStoreFactory.create(scope = scope) { dir.root.resolve("settings.preferences_pb") }
     }
 
     @After
-    fun close() = scopes.forEach { it.cancel() }
+    fun close() = runBlocking {
+        storeJobs.forEach { it.cancelAndJoin() }
+        storeJobs.clear()
+    }
 
     private fun DataStore<Preferences>.asked(): Long? = runBlocking { data.first()[AutoBlockerReturnAtKey] }
 
@@ -137,8 +142,8 @@ class AutoBlockerReturnTest {
         val before = store()
         AutoBlockerReturn.ask(before, tapped)
         // The process dies: its store goes with it, and the next process opens the same file.
-        scopes.forEach { it.cancel() }
-        scopes.clear()
+        storeJobs.forEach { it.cancelAndJoin() }
+        storeJobs.clear()
 
         val after = store()
         assertEquals(tapped, after.asked())
