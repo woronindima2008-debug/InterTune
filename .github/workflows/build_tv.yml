@@ -35,6 +35,16 @@ jobs:
       - name: Run all core Android TV unit tests
         run: ./gradlew testCoreTvUnitTest --stacktrace -DskipFormatKtlint
 
+      - name: Upload unit test reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: InterTune-TV-test-reports
+          path: |
+            app/build/test-results/testCoreTvUnitTest/*.xml
+            app/build/reports/tests/testCoreTvUnitTest/**
+          if-no-files-found: warn
+
   build:
     name: Build Android TV APK
     runs-on: ubuntu-latest
