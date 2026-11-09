@@ -22,8 +22,6 @@ import android.appwidget.AppWidgetManager
 import android.content.ComponentName
 import android.os.Bundle
 import android.os.SystemClock
-import android.os.Handler
-import android.os.Looper
 import android.view.KeyEvent
 import android.provider.MediaStore
 import android.util.Log
@@ -256,6 +254,7 @@ import com.dd3boh.outertune.ui.utils.dpadOverlay
 import com.dd3boh.outertune.ui.utils.dpadOverlayEscape
 import com.dd3boh.outertune.ui.utils.tvRemoteCursor
 import com.dd3boh.outertune.ui.utils.TvRemoteCursorState
+import com.dd3boh.outertune.ui.utils.DoubleCenterPressDetector
 import com.dd3boh.outertune.ui.utils.dpadTabBar
 import com.dd3boh.outertune.ui.utils.dpadBringIntoView
 import com.dd3boh.outertune.ui.utils.resetHeightOffset
@@ -471,20 +470,14 @@ private fun playFromWidget(
 class MainActivity : ComponentActivity() {
     val MAIN_TAG = "MainOtActivity"
 
-    private val remoteBackHandler = Handler(Looper.getMainLooper())
-    private var lastRemoteBackAt = 0L
-    private var pendingBackShouldNavigate = false
-    private var pendingRemoteBack: Runnable? = null
     private val tvRemoteCursor = TvRemoteCursorState()
     private val remoteCenterPressDetector = DoubleCenterPressDetector(600L)
     private var consumeRemoteCenterKeyUp = false
-    private val remoteBackDoublePressWindowMs = 600L
 
     /**
      * Handle TV remote input before Android routes it to the currently focused Compose child.
      * This makes pointer movement and OK independent of the focus tree on every app screen.
-     * Back remains a normal single press; two presses toggle the pointer. If the keyboard is
-     * open, the first press hides it but is still eligible to pair with the second press.
+     * Two consecutive OK presses toggle the pointer; Back is left to Android and Compose.
      */
     override fun dispatchKeyEvent(event: KeyEvent): Boolean {
         if (BuildConfig.BUILD_TYPE != "tv") return super.dispatchKeyEvent(event)
@@ -508,44 +501,6 @@ class MainActivity : ComponentActivity() {
         }
 
         if (tvRemoteCursor.onKeyEvent(event)) return true
-
-        if (event.keyCode == KeyEvent.KEYCODE_BACK) {
-            if (event.action == KeyEvent.ACTION_UP) return true
-            if (event.action != KeyEvent.ACTION_DOWN || event.repeatCount > 0) return true
-
-            val now = SystemClock.uptimeMillis()
-            if (lastRemoteBackAt != 0L && now - lastRemoteBackAt <= remoteBackDoublePressWindowMs) {
-                lastRemoteBackAt = 0L
-                pendingRemoteBack?.let(remoteBackHandler::removeCallbacks)
-                pendingRemoteBack = null
-                pendingBackShouldNavigate = false
-                tvRemoteCursor.toggle()
-                return true
-            }
-
-            lastRemoteBackAt = now
-            val imeVisible = ViewCompat.getRootWindowInsets(window.decorView)
-                ?.isVisible(WindowInsetsCompat.Type.ime()) == true
-            pendingBackShouldNavigate = !imeVisible
-            if (imeVisible) {
-                WindowInsetsControllerCompat(window, window.decorView)
-                    .hide(WindowInsetsCompat.Type.ime())
-            }
-
-            val back = Runnable {
-                if (lastRemoteBackAt == now) {
-                    lastRemoteBackAt = 0L
-                    pendingRemoteBack = null
-                    val shouldNavigate = pendingBackShouldNavigate
-                    pendingBackShouldNavigate = false
-                    if (shouldNavigate) onBackPressedDispatcher.onBackPressed()
-                }
-            }
-            pendingRemoteBack?.let(remoteBackHandler::removeCallbacks)
-            pendingRemoteBack = back
-            remoteBackHandler.postDelayed(back, remoteBackDoublePressWindowMs)
-            return true
-        }
 
         return super.dispatchKeyEvent(event)
     }

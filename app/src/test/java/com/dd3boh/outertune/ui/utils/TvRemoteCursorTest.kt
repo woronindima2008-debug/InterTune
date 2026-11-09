@@ -35,6 +35,21 @@ class TvRemoteCursorTest {
     }
 
     @Test
+    fun `second press at the window boundary toggles`() {
+        val detector = DoubleCenterPressDetector(windowMs = 600L)
+        assertFalse(detector.onPress(1_000L))
+        assertTrue(detector.onPress(1_600L))
+    }
+
+    @Test
+    fun `three presses form one completed pair and a new first press`() {
+        val detector = DoubleCenterPressDetector(windowMs = 600L)
+        assertFalse(detector.onPress(1_000L))
+        assertTrue(detector.onPress(1_200L))
+        assertFalse(detector.onPress(1_300L))
+    }
+
+    @Test
     fun `press outside window does not complete previous pair`() {
         val detector = DoubleCenterPressDetector(windowMs = 600L)
         assertFalse(detector.onPress(1_000L))

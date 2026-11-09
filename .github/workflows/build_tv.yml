@@ -36,6 +36,7 @@ jobs:
         run: >-
           ./gradlew testCoreTvUnitTest
           --tests 'com.dd3boh.outertune.ui.utils.DpadFocusTest'
+          --tests 'com.dd3boh.outertune.ui.utils.TvRemoteCursorTest'
           --tests 'com.dd3boh.outertune.ui.player.LandscapeControlsWidthTest'
           --stacktrace -DskipFormatKtlint
 
