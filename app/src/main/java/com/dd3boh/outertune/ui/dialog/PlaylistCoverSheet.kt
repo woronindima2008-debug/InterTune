@@ -6,6 +6,7 @@
 
 package com.dd3boh.outertune.ui.dialog
 
+import com.dd3boh.outertune.ui.utils.dpadFocusIndicator
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -277,6 +278,7 @@ fun PlaylistCoverEditor(playlist: Playlist, onChange: () -> Unit) {
         Box(
             modifier = Modifier
                 .clip(shape)
+                .dpadFocusIndicator(shape)
                 .clickable(onClick = onChange)
                 .clearAndSetSemantics { }
         ) {
@@ -289,7 +291,8 @@ fun PlaylistCoverEditor(playlist: Playlist, onChange: () -> Unit) {
                 iconTint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.8f),
             )
         }
-        TextButton(onClick = onChange) {
+        TextButton(modifier = Modifier.dpadFocusIndicator(),
+onClick = onChange) {
             Text(stringResource(R.string.playlist_cover_change))
         }
     }

@@ -6,6 +6,7 @@
 
 package com.dd3boh.outertune.ui.dialog
 
+import com.dd3boh.outertune.ui.utils.dpadFocusIndicator
 import android.content.Context
 import android.text.format.DateFormat
 import androidx.compose.foundation.clickable
@@ -91,14 +92,17 @@ private fun ClockFaceDialog(title: String, minuteOfDay: Int, onDismiss: () -> Un
         onDismiss = onDismiss,
         title = { Text(title) },
         buttons = {
-            TextButton(onClick = onDismiss) { Text(stringResource(android.R.string.cancel)) }
-            TextButton(onClick = { onConfirm(state.hour * 60 + state.minute) }) { Text(stringResource(android.R.string.ok)) }
+            TextButton(modifier = Modifier.dpadFocusIndicator(),
+onClick = onDismiss) { Text(stringResource(android.R.string.cancel)) }
+            TextButton(modifier = Modifier.dpadFocusIndicator(),
+onClick = { onConfirm(state.hour * 60 + state.minute) }) { Text(stringResource(android.R.string.ok)) }
         },
         buttonsStart = {
             // Material's own button for this (TimePickerDialogDefaults.DisplayModeToggle, 1.4.0)
             // tells a screen reader the opposite of what it does: "Switch to clock mode" under the
             // keyboard's picture, while the clock face is showing.
-            IconButton(onClick = { typing = !typing }) {
+            IconButton(modifier = Modifier.dpadFocusIndicator(),
+onClick = { typing = !typing }) {
                 Icon(
                     imageVector = if (typing) Icons.Rounded.Schedule else Icons.Rounded.Keyboard,
                     contentDescription = stringResource(if (typing) R.string.time_of_day_clock_face else R.string.time_of_day_type),

@@ -9,6 +9,7 @@
 
 package com.dd3boh.outertune.ui.dialog
 
+import com.dd3boh.outertune.ui.utils.dpadFocusIndicator
 import android.content.ClipData
 import android.text.format.Formatter
 import androidx.compose.foundation.background
@@ -113,10 +114,12 @@ fun AskFirstDialog(
             Text(title, modifier = Modifier.padding(start = 16.dp, end = 16.dp, top = 16.dp, bottom = 4.dp))
         },
         buttons = {
-            TextButton(onClick = onDismiss) {
+            TextButton(modifier = Modifier.dpadFocusIndicator(),
+onClick = onDismiss) {
                 Text(stringResource(android.R.string.cancel))
             }
-            TextButton(onClick = onConfirm) {
+            TextButton(modifier = Modifier.dpadFocusIndicator(),
+onClick = onConfirm) {
                 Text(confirm)
             }
         },
@@ -303,12 +306,14 @@ fun TextFieldDialog(
     }
 
     val buttons: @Composable () -> Unit = {
-        TextButton(onClick = onDismiss) {
+        TextButton(modifier = Modifier.dpadFocusIndicator(),
+onClick = onDismiss) {
             Text(text = stringResource(android.R.string.cancel))
         }
 
         TextButton(
-            enabled = isInputValid(textFieldValue.text),
+            modifier = Modifier.dpadFocusIndicator(),
+enabled = isInputValid(textFieldValue.text),
             onClick = {
                 onDismiss()
                 onDone(textFieldValue.text)
@@ -447,7 +452,8 @@ fun ActionPromptDialog(
                 start = {
                     if (onReset != null) {
                         TextButton(
-                            onClick = { onReset() },
+                            modifier = Modifier.dpadFocusIndicator(),
+onClick = { onReset() },
                         ) {
                             Text(stringResource(R.string.reset))
                         }
@@ -456,14 +462,16 @@ fun ActionPromptDialog(
             ) {
                 if (onCancel != null) {
                     TextButton(
-                        onClick = { onCancel() }
+                        modifier = Modifier.dpadFocusIndicator(),
+onClick = { onCancel() }
                     ) {
                         Text(stringResource(android.R.string.cancel))
                     }
                 }
 
                 TextButton(
-                    onClick = { onConfirm() },
+                    modifier = Modifier.dpadFocusIndicator(),
+onClick = { onConfirm() },
                     enabled = isInputValid
                 ) {
                     Text(stringResource(android.R.string.ok))
@@ -542,7 +550,8 @@ fun CounterDialog(
                     start = {
                         if (onReset != null) {
                             TextButton(
-                                onClick = { onReset() },
+                                modifier = Modifier.dpadFocusIndicator(),
+onClick = { onReset() },
                             ) {
                                 Text(stringResource(R.string.reset))
                             }
@@ -550,14 +559,16 @@ fun CounterDialog(
                     },
                 ) {
                     TextButton(
-                        onClick = { onConfirm(tempValue.intValue) }
+                        modifier = Modifier.dpadFocusIndicator(),
+onClick = { onConfirm(tempValue.intValue) }
                     ) {
                         Text(stringResource(android.R.string.ok))
                     }
 
                     if (onCancel != null)
                         TextButton(
-                            onClick = { onCancel() }
+                            modifier = Modifier.dpadFocusIndicator(),
+onClick = { onCancel() }
                         ) {
                             Text(stringResource(android.R.string.cancel))
                         }
@@ -590,7 +601,8 @@ fun DetailsDialog(
         },
         confirmButton = {
             TextButton(
-                onClick = { setVisibility(false) }
+                modifier = Modifier.dpadFocusIndicator(),
+onClick = { setVisibility(false) }
             ) {
                 Text(stringResource(android.R.string.ok))
             }

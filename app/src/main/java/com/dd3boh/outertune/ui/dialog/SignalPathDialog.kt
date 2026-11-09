@@ -6,6 +6,7 @@
 
 package com.dd3boh.outertune.ui.dialog
 
+import com.dd3boh.outertune.ui.utils.dpadFocusIndicator
 import android.media.AudioAttributes
 import android.media.AudioDeviceInfo
 import android.media.AudioManager
@@ -198,7 +199,8 @@ fun SignalPathDialog(currentFormat: FormatEntity?, local: Boolean, onDismiss: ()
         onDismissRequest = onDismiss,
         icon = { Icon(Icons.Rounded.Route, contentDescription = null) },
         title = { Text(stringResource(R.string.signal_path)) },
-        confirmButton = { TextButton(onClick = onDismiss) { Text(stringResource(android.R.string.ok)) } },
+        confirmButton = { TextButton(modifier = Modifier.dpadFocusIndicator(),
+onClick = onDismiss) { Text(stringResource(android.R.string.ok)) } },
         text = {
             Column(
                 modifier = Modifier

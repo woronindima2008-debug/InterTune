@@ -8,6 +8,7 @@
 package com.dd3boh.outertune.ui.dialog
 
 
+import com.dd3boh.outertune.ui.utils.dpadFocusIndicator
 import android.content.Context
 import android.net.Uri
 import android.widget.Toast
@@ -175,7 +176,8 @@ fun ImportM3uDialog(
             }
 
             Button(
-                onClick = {
+                modifier = Modifier.dpadFocusIndicator(),
+onClick = {
                     importedSongs.clear()
                     rejectedSongs.clear()
                     importM3uLauncher.launch(arrayOf("audio/*"))
@@ -268,7 +270,8 @@ fun ImportM3uDialog(
             modifier = Modifier.fillMaxWidth()
         ) {
             TextButton(
-                onClick = {
+                modifier = Modifier.dpadFocusIndicator(),
+onClick = {
                     onDismiss()
                 }
             ) {
@@ -276,7 +279,8 @@ fun ImportM3uDialog(
             }
 
             TextButton(
-                onClick = {
+                modifier = Modifier.dpadFocusIndicator(),
+onClick = {
                     showChoosePlaylistDialog = true
                 },
                 enabled = importedSongs.isNotEmpty()

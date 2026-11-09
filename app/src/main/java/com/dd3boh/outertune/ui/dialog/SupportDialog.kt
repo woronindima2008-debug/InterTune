@@ -6,6 +6,7 @@
 
 package com.dd3boh.outertune.ui.dialog
 
+import com.dd3boh.outertune.ui.utils.dpadFocusIndicator
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -82,11 +83,13 @@ fun SupportDialog(onDismiss: () -> Unit) {
         },
         confirmButton = {
             // InterTune's server, not a fork's (FORKS.md).
-            if (BuiltInKeys.official) TextButton(onClick = {
+            if (BuiltInKeys.official) TextButton(modifier = Modifier.dpadFocusIndicator(),
+onClick = {
                 uriHandler.openUri(Links.DISCORD)
                 onDismiss()
             }) { Text(stringResource(R.string.support_discord)) }
         },
-        dismissButton = { TextButton(onClick = onDismiss) { Text(stringResource(android.R.string.ok)) } },
+        dismissButton = { TextButton(modifier = Modifier.dpadFocusIndicator(),
+onClick = onDismiss) { Text(stringResource(android.R.string.ok)) } },
     )
 }

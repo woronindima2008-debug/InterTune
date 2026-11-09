@@ -1,5 +1,6 @@
 package com.dd3boh.outertune.ui.dialog
 
+import com.dd3boh.outertune.ui.utils.dpadFocusIndicator
 import android.content.Context
 import android.os.Handler
 import android.os.Looper
@@ -243,7 +244,8 @@ fun AddToPlaylistDialog(
         if (syncMode == SyncMode.RO) {
             item {
                 TextButton(
-                    onClick = {
+                    modifier = Modifier.dpadFocusIndicator(),
+onClick = {
                         navController.navigate("settings/account_sync")
                         onDismiss()
                     }
@@ -273,7 +275,8 @@ fun AddToPlaylistDialog(
             title = { Text(stringResource(R.string.duplicates)) },
             buttons = {
                 TextButton(
-                    onClick = {
+                    modifier = Modifier.dpadFocusIndicator(),
+onClick = {
                         showDuplicateDialog = false
                         onDismiss()
                         val playlist = selectedPlaylist!!
@@ -285,7 +288,8 @@ fun AddToPlaylistDialog(
                 }
 
                 TextButton(
-                    onClick = {
+                    modifier = Modifier.dpadFocusIndicator(),
+onClick = {
                         showDuplicateDialog = false
                         onDismiss()
                         val playlist = selectedPlaylist!!
@@ -297,7 +301,8 @@ fun AddToPlaylistDialog(
                 }
 
                 TextButton(
-                    onClick = {
+                    modifier = Modifier.dpadFocusIndicator(),
+onClick = {
                         showDuplicateDialog = false
                     }
                 ) {
