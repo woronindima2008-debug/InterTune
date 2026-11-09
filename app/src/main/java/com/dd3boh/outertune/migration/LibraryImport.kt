@@ -354,11 +354,16 @@ class LibraryImport internal constructor(
                 refresh(run)
                 saveSoon()
             }
+            // Queue the final checkpoint before publishing a stopped state. The screen (and a
+            // process killed immediately after it) must never observe PAUSED/MATCHED while the
+            // last answers are still waiting to be put on disk.
+            saveNow()
             setStage(Stage.MATCHED, run)
         } catch (e: SearchRefused) {
             // A run that was cancelled as the refusal came stays as Cancel left it.
             currentCoroutineContext().ensureActive()
             Log.w(TAG, "Paused matching: YouTube refused a search, or the app is backing off", ErrorText.forLog(e))
+            saveNow()
             setStage(Stage.PAUSED, run)
         } catch (e: SearchUnavailable) {
             // A run that was cancelled while its last try was failing stays as Cancel left it.
@@ -368,9 +373,11 @@ class LibraryImport internal constructor(
             // send somebody to look at a connection that is fine.
             if (e.answered) {
                 Log.w(TAG, "Paused matching: YouTube kept answering with an error", ErrorText.forLog(e))
+                saveNow()
                 setStage(Stage.PAUSED, run)
             } else {
                 Log.w(TAG, "Stopped matching: YouTube could not be reached", ErrorText.forLog(e))
+                saveNow()
                 setStage(Stage.OFFLINE, run)
             }
         }
