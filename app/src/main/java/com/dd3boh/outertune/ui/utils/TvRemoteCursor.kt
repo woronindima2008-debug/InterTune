@@ -56,7 +56,7 @@ internal class DoubleCenterPressDetector(
 
 /** Smaller repeat steps keep held D-pad movement smooth on TV air-mice. */
 internal fun tvCursorStepDp(repeatCount: Int): Float =
-    if (repeatCount <= 0) 24f else 12f
+    if (repeatCount <= 0) 18f else 6f
 
 /**
  * Activity-owned pointer state. Key events are handled by MainActivity, not Compose focus,

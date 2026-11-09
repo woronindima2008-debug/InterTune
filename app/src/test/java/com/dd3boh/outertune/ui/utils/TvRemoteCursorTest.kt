@@ -16,6 +16,8 @@ class TvRemoteCursorTest {
     fun `cursor movement uses smaller steps while a direction key repeats`() {
         assertTrue(tvCursorStepDp(0) > tvCursorStepDp(1))
         assertTrue(tvCursorStepDp(1) > 0f)
+        assertTrue(tvCursorStepDp(0) == 18f)
+        assertTrue(tvCursorStepDp(1) == 6f)
     }
 
 

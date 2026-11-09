@@ -16,7 +16,10 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.width
 import androidx.compose.material3.Button
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.Bedtime
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationRail
@@ -45,7 +48,9 @@ import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import com.dd3boh.outertune.R
 import com.dd3boh.outertune.ui.menu.GridMenu
+import com.dd3boh.outertune.ui.menu.GridMenuItem
 import com.dd3boh.outertune.ui.menu.SleepTimerGridMenu
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalTestApi::class)
@@ -212,6 +217,45 @@ class DpadNavigationInstrumentedTest {
             runCatching {
                 composeRule.onNodeWithTag("settings-first-result").assertIsFocused()
             }.isSuccess
+        }
+    }
+
+    @Test
+    fun dpadMovesAcrossGridRowsAndKeepsMenuItemsReachable() {
+        val firstFocus = FocusRequester()
+        val fourthFocus = FocusRequester()
+
+        composeRule.setContent {
+            val inputModeManager = LocalInputModeManager.current
+            LaunchedEffect(Unit) {
+                inputModeManager.requestInputMode(InputMode.Keyboard)
+                firstFocus.requestFocus()
+            }
+            MaterialTheme {
+                GridMenu(Modifier.width(400.dp).height(260.dp)) {
+                    repeat(6) { index ->
+                        GridMenuItem(
+                            modifier = Modifier
+                                .then(if (index == 0) Modifier.focusRequester(firstFocus) else Modifier)
+                                .then(if (index == 3) Modifier.focusRequester(fourthFocus) else Modifier)
+                                .testTag("grid-item-$index"),
+                            icon = Icons.Rounded.Bedtime,
+                            title = R.string.sleep_timer,
+                            onClick = {},
+                        )
+                    }
+                }
+            }
+        }
+
+        composeRule.waitForIdle()
+        composeRule.onNodeWithTag("grid-item-0").assertIsFocused()
+        composeRule.onNodeWithTag("grid-item-0").performKeyInput {
+            keyDown(Key.DirectionDown)
+            keyUp(Key.DirectionDown)
+        }
+        composeRule.waitUntil(5_000) {
+            runCatching { composeRule.onNodeWithTag("grid-item-3").assertIsFocused() }.isSuccess
         }
     }
 
