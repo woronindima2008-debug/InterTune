@@ -86,6 +86,23 @@ class LandscapeControlsWidthTest {
     }
 
     @Test
+    fun `TV control row may exceed the artwork fraction rather than clip rightmost buttons`() {
+        // At 480dp, six 48dp slots plus the play button, gaps and gutters need 396dp.
+        // The old 78% cap gave only 374.4dp and clipped the last controls.
+        val width = landscapeControlsWidth(
+            available = 480.dp,
+            playButton = 72.dp,
+            slots = 6,
+            gutter = 12.dp,
+            maxControlsFraction = 0.78f,
+            slot = 48.dp,
+            playButtonGap = 6.dp,
+        )
+        assertEquals(396f, width.value, 0.01f)
+        assertTrue(width <= 480.dp)
+    }
+
+    @Test
     fun `TV always gets the landscape player layout below the generic 600dp threshold`() {
         assertTrue(shouldUseLandscapePlayerLayout(isLandscape = true, tabMode = false, wideScreen = false, tvBuild = true))
         assertTrue(shouldUseLandscapePlayerLayout(isLandscape = true, tabMode = false, wideScreen = true, tvBuild = true))
