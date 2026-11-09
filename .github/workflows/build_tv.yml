@@ -11,10 +11,10 @@ on:
       - visionos-fix
 
 jobs:
-  build:
+  test:
+    name: Android TV unit tests
     runs-on: ubuntu-latest
     timeout-minutes: 45
-
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -34,6 +34,27 @@ jobs:
 
       - name: Run all core Android TV unit tests
         run: ./gradlew testCoreTvUnitTest --stacktrace -DskipFormatKtlint
+
+  build:
+    name: Build Android TV APK
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          submodules: recursive
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          java-version: 21
+          distribution: temurin
+          cache: gradle
+
+      - name: Accept SDK licenses
+        run: yes | /usr/local/lib/android/sdk/cmdline-tools/latest/bin/sdkmanager --licenses
 
       - name: Build Android TV APK
         run: ./gradlew assembleCoreTv --stacktrace -DskipFormatKtlint
