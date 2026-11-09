@@ -552,6 +552,10 @@ fun Modifier.dpadOverlayEscape(
             // reports focus. The caller only dismisses search when the IME is actually hidden.
             if (direction == DpadDirection.Down && onSearchDown?.invoke() == true) {
                 scope.launch {
+                    // SearchBar's full-screen surface takes 300 ms to close. Waiting for
+                    // the animation to finish matters: during it, suggestion rows are still
+                    // composed and can win the geometric search ahead of the page content.
+                    kotlinx.coroutines.delay(320L)
                     withFrameNanos { }
                     if (!moveDpadFocusFromAnywhere(view, DpadDirection.Down)) {
                         focusManager.moveFocus(FocusDirection.Down)
