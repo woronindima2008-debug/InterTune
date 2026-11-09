@@ -6,7 +6,6 @@
 
 package com.dd3boh.outertune.ui.utils
 
-import android.os.SystemClock
 import android.view.MotionEvent
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.composed
@@ -25,21 +24,14 @@ import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
-import kotlinx.coroutines.Job
-import kotlinx.coroutines.delay
-import kotlinx.coroutines.launch
-import kotlin.math.roundToInt
-
-private const val BACK_DOUBLE_TAP_MS = 380L
 
 /**
  * In-app pointer for Android TV remotes.
@@ -49,17 +41,21 @@ private const val BACK_DOUBLE_TAP_MS = 380L
  * In pointer mode the D-pad moves the pointer and OK sends a normal touch pair to the Compose
  * root view, letting existing buttons and click handlers work without accessibility access.
  */
-fun Modifier.tvRemoteCursor(onBack: () -> Unit): Modifier = composed {
+fun Modifier.tvRemoteCursor(toggleVersion: Int): Modifier = composed {
     val view = LocalView.current
     val density = LocalDensity.current
-    val scope = rememberCoroutineScope()
-    val latestOnBack by rememberUpdatedState(onBack)
 
     var enabled by rememberSaveable { mutableStateOf(false) }
+    var lastToggleVersion by remember { mutableIntStateOf(toggleVersion) }
     var size by remember { mutableStateOf(IntSize.Zero) }
     var position by remember { mutableStateOf(Offset.Zero) }
-    var lastBackAt by remember { mutableLongStateOf(0L) }
-    var pendingBack by remember { mutableStateOf<Job?>(null) }
+
+    LaunchedEffect(toggleVersion) {
+        if (toggleVersion != lastToggleVersion) {
+            enabled = !enabled
+            lastToggleVersion = toggleVersion
+        }
+    }
 
     val step = with(density) { 28.dp.toPx() }
     val pointerWidth = with(density) { 28.dp.toPx() }
@@ -78,44 +74,19 @@ fun Modifier.tvRemoteCursor(onBack: () -> Unit): Modifier = composed {
             }
         }
         .onPreviewKeyEvent { event ->
-            val key = event.key
-            val down = event.type == KeyEventType.KeyDown
-
-            if (key == Key.Back) {
-                if (!down) return@onPreviewKeyEvent true
-                if (event.nativeKeyEvent.repeatCount > 0) return@onPreviewKeyEvent true
-
-                val now = SystemClock.uptimeMillis()
-                if (lastBackAt != 0L && now - lastBackAt <= BACK_DOUBLE_TAP_MS) {
-                    pendingBack?.cancel()
-                    pendingBack = null
-                    lastBackAt = 0L
-                    enabled = !enabled
-                    if (enabled && size != IntSize.Zero) {
-                        position = Offset(size.width / 2f, size.height / 2f)
-                    }
-                } else {
-                    lastBackAt = now
-                    pendingBack?.cancel()
-                    pendingBack = scope.launch {
-                        delay(BACK_DOUBLE_TAP_MS)
-                        if (lastBackAt == now) {
-                            lastBackAt = 0L
-                            latestOnBack()
-                        }
-                    }
-                }
-                return@onPreviewKeyEvent true
-            }
-
             if (!enabled) return@onPreviewKeyEvent false
+            val key = event.key
             if (key !in setOf(
                     Key.DirectionUp, Key.DirectionDown, Key.DirectionLeft,
                     Key.DirectionRight, Key.DirectionCenter, Key.Enter, Key.NumPadEnter
                 )
             ) return@onPreviewKeyEvent false
 
-            if (!down) return@onPreviewKeyEvent true
+            if (event.type != KeyEventType.KeyDown) return@onPreviewKeyEvent true
+            if (event.nativeKeyEvent.repeatCount > 0 &&
+                key != Key.DirectionUp && key != Key.DirectionDown &&
+                key != Key.DirectionLeft && key != Key.DirectionRight
+            ) return@onPreviewKeyEvent true
 
             when (key) {
                 Key.DirectionUp -> position = Offset(position.x, (position.y - step).coerceAtLeast(0f))
