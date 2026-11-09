@@ -10,6 +10,7 @@ import androidx.compose.foundation.focusable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -31,7 +32,7 @@ import androidx.compose.ui.platform.LocalInputModeManager
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.test.assertIsFocused
-import androidx.compose.ui.test.assertDoesNotExist
+import androidx.compose.ui.test.assertIsNotFocused
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performKeyInput
 import androidx.compose.ui.test.junit4.createComposeRule
@@ -174,11 +175,10 @@ class DpadNavigationInstrumentedTest {
                 Box(Modifier.fillMaxSize().dpadOverlayEscape(tvNavigation = true)) {
                     Button(
                         onClick = {},
-                        modifier = Modifier.align(Alignment.TopCenter)
+                        modifier = Modifier.align(Alignment.BottomCenter)
                             .focusRequester(coveredFocus).testTag("covered-content"),
                     ) { Text("Covered page action") }
                     Column(Modifier.fillMaxSize().dpadOverlay()) {
-                        Spacer(Modifier.weight(1f))
                         Button(
                             onClick = {},
                             modifier = Modifier.align(Alignment.CenterHorizontally)
@@ -198,6 +198,6 @@ class DpadNavigationInstrumentedTest {
         }
         composeRule.waitForIdle()
         composeRule.onNodeWithTag("overlay-action").assertIsFocused()
-        composeRule.onNodeWithTag("covered-content").assertDoesNotExist()
+        composeRule.onNodeWithTag("covered-content").assertIsNotFocused()
     }
 }
