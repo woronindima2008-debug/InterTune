@@ -22,6 +22,9 @@ import android.appwidget.AppWidgetManager
 import android.content.ComponentName
 import android.os.Bundle
 import android.os.SystemClock
+import android.os.Handler
+import android.os.Looper
+import android.view.KeyEvent
 import android.provider.MediaStore
 import android.util.Log
 import android.widget.Toast
@@ -144,6 +147,9 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.util.fastForEach
 import androidx.core.net.toUri
 import androidx.core.view.WindowCompat
+import androidx.core.view.ViewCompat
+import androidx.core.view.WindowInsetsCompat
+import androidx.core.view.WindowInsetsControllerCompat
 import androidx.navigation.NavBackStackEntry
 import androidx.navigation.NavController
 import androidx.navigation.NavHostController
@@ -463,6 +469,56 @@ private fun playFromWidget(
 @AndroidEntryPoint
 class MainActivity : ComponentActivity() {
     val MAIN_TAG = "MainOtActivity"
+
+    private val remoteBackHandler = Handler(Looper.getMainLooper())
+    private var lastRemoteBackAt = 0L
+    private var pendingRemoteBack: Runnable? = null
+    private val remoteCursorToggle = mutableIntStateOf(0)
+
+    /**
+     * Android TV Back is a KEYCODE_BACK, and the IME can consume it before Compose sees it.
+     * Observe it at the Activity boundary so the first press can hide the keyboard and the
+     * second press can reliably toggle the in-app pointer. With the IME hidden, a single Back
+     * is delayed only for the double-press window and then sent to the normal Back dispatcher.
+     */
+    override fun dispatchKeyEvent(event: KeyEvent): Boolean {
+        if (BuildConfig.BUILD_TYPE == "tv" && event.keyCode == KeyEvent.KEYCODE_BACK) {
+            if (event.action == KeyEvent.ACTION_UP) return true
+            if (event.action == KeyEvent.ACTION_DOWN) {
+                if (event.repeatCount > 0) return true
+                val now = SystemClock.uptimeMillis()
+                if (lastRemoteBackAt != 0L && now - lastRemoteBackAt <= 380L) {
+                    lastRemoteBackAt = 0L
+                    pendingRemoteBack?.let(remoteBackHandler::removeCallbacks)
+                    pendingRemoteBack = null
+                    remoteCursorToggle.intValue++
+                    return true
+                }
+
+                lastRemoteBackAt = now
+                val imeVisible = ViewCompat.getRootWindowInsets(window.decorView)
+                    ?.isVisible(WindowInsetsCompat.Type.ime()) == true
+                if (imeVisible) {
+                    WindowInsetsControllerCompat(window, window.decorView)
+                        .hide(WindowInsetsCompat.Type.ime())
+                    return true
+                }
+
+                val back = Runnable {
+                    if (lastRemoteBackAt == now) {
+                        lastRemoteBackAt = 0L
+                        pendingRemoteBack = null
+                        onBackPressedDispatcher.onBackPressed()
+                    }
+                }
+                pendingRemoteBack?.let(remoteBackHandler::removeCallbacks)
+                pendingRemoteBack = back
+                remoteBackHandler.postDelayed(back, 380L)
+                return true
+            }
+        }
+        return super.dispatchKeyEvent(event)
+    }
 
     @Inject
     lateinit var database: MusicDatabase
@@ -1897,9 +1953,7 @@ class MainActivity : ComponentActivity() {
                                 .fillMaxSize()
                                 .then(
                                     if (BuildConfig.BUILD_TYPE == "tv") {
-                                        Modifier.tvRemoteCursor {
-                                            onBackPressedDispatcher.onBackPressed()
-                                        }
+                                        Modifier.tvRemoteCursor(remoteCursorToggle.intValue)
                                     } else Modifier
                                 )
                                 .dpadOverlayEscape(
