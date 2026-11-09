@@ -84,6 +84,8 @@ class TvRemoteCursorState {
     /** Restores a usable Compose focus target when navigation has left the screen unfocused. */
     fun focusFirstTarget(): Boolean = targetView?.let(::focusFirstDpadTarget) ?: false
 
+    fun hasFocusTarget(): Boolean = targetView?.let(::hasDpadFocus) ?: false
+
     fun toggle() {
         enabled = !enabled
         if (!enabled) requestKeyboardMode()

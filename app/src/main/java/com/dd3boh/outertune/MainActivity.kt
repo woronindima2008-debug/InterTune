@@ -1966,10 +1966,14 @@ class MainActivity : ComponentActivity() {
 
                             kotlinx.coroutines.delay(350L)
                             withFrameNanos { }
-                            val tabFocused = if (onTabRoot) {
-                                runCatching { selectedTabFocus.requestFocus() }.getOrDefault(false)
-                            } else false
-                            if (!tabFocused) tvRemoteCursor.focusFirstTarget()
+                            // Do not steal focus if the user has already started navigating
+                            // during the delay above.
+                            if (!tvRemoteCursor.hasFocusTarget()) {
+                                val tabFocused = if (onTabRoot) {
+                                    runCatching { selectedTabFocus.requestFocus() }.getOrDefault(false)
+                                } else false
+                                if (!tabFocused) tvRemoteCursor.focusFirstTarget()
+                            }
                         }
 
                         Box(

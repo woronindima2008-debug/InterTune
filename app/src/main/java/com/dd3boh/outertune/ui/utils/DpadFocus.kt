@@ -774,6 +774,16 @@ internal fun focusFirstDpadTarget(view: View): Boolean {
     return moveFromOverlay(owner.unmergedRootSemanticsNode, direction = null, fromAnywhere = true) == DpadMove.Moved
 }
 
+/** Whether any visible Compose focus target currently owns focus. */
+internal fun hasDpadFocus(view: View): Boolean {
+    val owner = (view as? RootForTest)?.semanticsOwner ?: return false
+    fun visit(node: SemanticsNode): Boolean {
+        if (node.config.getOrElse(SemanticsProperties.Focused) { false }) return true
+        return node.children.any(::visit)
+    }
+    return visit(owner.unmergedRootSemanticsNode)
+}
+
 /** The uppermost, then leftmost, non-empty target; kept pure so its ordering is unit-tested. */
 internal fun firstDpadTargetIndex(bounds: List<Rect>): Int? =
     bounds.indices
