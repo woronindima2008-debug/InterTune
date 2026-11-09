@@ -726,7 +726,7 @@ class BinauralAudioProcessorTest {
         AudioProcessor.AudioFormat(rate, channels, C.ENCODING_PCM_FLOAT)
 
     private fun surround(channels: Int, third: Boolean = false, width: Float? = null) =
-        BinauralAudioProcessor().apply {
+        BinauralAudioProcessor(surroundEnabled = true).apply {
             enabled = true
             thirdOrder = third
             if (width != null) stageWidthDegrees = width
