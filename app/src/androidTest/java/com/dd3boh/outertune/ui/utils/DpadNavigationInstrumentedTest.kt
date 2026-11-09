@@ -7,6 +7,8 @@
 package com.dd3boh.outertune.ui.utils
 
 import androidx.compose.foundation.focusable
+import androidx.compose.foundation.focusGroup
+import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -158,6 +160,55 @@ class DpadNavigationInstrumentedTest {
             }.isSuccess
         }
         composeRule.runOnIdle { assert(!searchActive.value) }
+    }
+
+    @Test
+    fun downFromEditableSettingsSearchEscapesItsFocusGroup() {
+        val searchFocus = FocusRequester()
+        val firstSettingFocus = FocusRequester()
+
+        composeRule.setContent {
+            val inputModeManager = LocalInputModeManager.current
+            LaunchedEffect(Unit) {
+                inputModeManager.requestInputMode(InputMode.Keyboard)
+                searchFocus.requestFocus()
+            }
+            MaterialTheme {
+                Box(Modifier.fillMaxSize().dpadOverlayEscape(tvNavigation = true)) {
+                    Column(Modifier.fillMaxSize().focusGroup()) {
+                        Row(Modifier.fillMaxWidth().dpadOverlay()) {
+                            BasicTextField(
+                                value = "",
+                                onValueChange = {},
+                                modifier = Modifier
+                                    .focusRequester(searchFocus)
+                                    .testTag("settings-search-editable"),
+                            )
+                        }
+                        Button(
+                            onClick = {},
+                            modifier = Modifier
+                                .focusRequester(firstSettingFocus)
+                                .testTag("settings-first-result"),
+                        ) {
+                            Text("First setting")
+                        }
+                    }
+                }
+            }
+        }
+
+        composeRule.waitForIdle()
+        composeRule.onNodeWithTag("settings-search-editable").assertIsFocused()
+        composeRule.onNodeWithTag("settings-search-editable").performKeyInput {
+            keyDown(Key.DirectionDown)
+            keyUp(Key.DirectionDown)
+        }
+        composeRule.waitUntil(5_000) {
+            runCatching {
+                composeRule.onNodeWithTag("settings-first-result").assertIsFocused()
+            }.isSuccess
+        }
     }
 
     @Test
