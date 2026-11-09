@@ -1971,11 +1971,12 @@ class MainActivity : ComponentActivity() {
                                 searchActive || tvRemoteCursor.enabled || navBackStackEntry == null
                             ) return@LaunchedEffect
 
-                            // A destination can still be entering or its first lazy row may
-                            // not be attached after a single transition delay. Retry focus until
-                            // Compose exposes a real target, as TV navigation must never start
-                            // with an unfocused screen. Stop immediately if the user has already
-                            // acquired focus; never steal it during these retries.
+                            // Let the destination transition finish before checking focus:
+                            // the outgoing page can still own it while both pages are composed.
+                            kotlinx.coroutines.delay(350L)
+                            // A destination's first lazy row may still not be attached. Retry
+                            // until Compose exposes a real target, without stealing focus once
+                            // the user has started navigating.
                             for (attempt in 0 until 25) {
                                 if (tvRemoteCursor.hasFocusTarget()) break
                                 val tabFocused = if (onTabRoot) {
