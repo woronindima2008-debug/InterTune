@@ -547,6 +547,19 @@ fun Modifier.dpadOverlayEscape(
         if (tvNavigation) {
             val owner = (view as? RootForTest)?.semanticsOwner ?: return@onPreviewKeyEvent false
 
+            // The TV IME can disappear while the app-wide search surface stays expanded.
+            // In that state the next Down belongs to the page, even if the text field no longer
+            // reports focus. The caller only dismisses search when the IME is actually hidden.
+            if (direction == DpadDirection.Down && onSearchDown?.invoke() == true) {
+                scope.launch {
+                    withFrameNanos { }
+                    if (!moveDpadFocusFromAnywhere(view, DpadDirection.Down)) {
+                        focusManager.moveFocus(FocusDirection.Down)
+                    }
+                }
+                return@onPreviewKeyEvent true
+            }
+
             val focusedEditable = focusedNodeIsEditable(owner.unmergedRootSemanticsNode)
 
             // Left/right inside an editable field belong to text editing, not focus traversal.
@@ -559,24 +572,6 @@ fun Modifier.dpadOverlayEscape(
             // hand Down directly to the screen-wide geometry search so the first visible
             // destination item below the search receives focus.
             if (direction == DpadDirection.Down && focusedEditable) {
-                // The app-wide search owns Back separately from the IME. Handle Down here,
-                // before the search field or the still-animating overlay can consume it:
-                // dismiss the search surface, wait for its semantics to leave, then focus
-                // the first visible destination below it.
-                if (onSearchDown?.invoke() == true) {
-                    scope.launch {
-                        withFrameNanos { }
-                        if (!moveFromOverlay(
-                                owner.unmergedRootSemanticsNode,
-                                DpadDirection.Down,
-                                fromAnywhere = true,
-                            )
-                        ) {
-                            focusManager.moveFocus(FocusDirection.Down)
-                        }
-                    }
-                    return@onPreviewKeyEvent true
-                }
                 return@onPreviewKeyEvent when (
                     moveFromOverlay(owner.unmergedRootSemanticsNode, direction, fromAnywhere = true)
                 ) {
