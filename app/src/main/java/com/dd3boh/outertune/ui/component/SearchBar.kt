@@ -406,6 +406,9 @@ private fun SearchBarInputField(
                     if (active && event.type == KeyEventType.KeyDown && event.key == Key.DirectionDown) {
                         scope.launch {
                             onActiveChange(false)
+                            // The full-screen suggestions remain composed during the 300 ms
+                            // close animation. Let them leave before searching the page below.
+                            kotlinx.coroutines.delay(320L)
                             withFrameNanos { }
                             if (!moveDpadFocusFromAnywhere(view, DpadDirection.Down)) {
                                 focusManager.moveFocus(FocusDirection.Down)
