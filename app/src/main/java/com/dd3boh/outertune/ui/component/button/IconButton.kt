@@ -94,6 +94,7 @@ fun ResizableIconButton(
             )
             .alpha(if (enabled) 1f else 0.5f)
             .then(modifier)
+            .dpadFocusIndicator(CircleShape)
     )
 }
 
@@ -157,7 +158,8 @@ fun IconTextButton(
     ) {
         Icon(icon, contentDescription = null)
         TextButton(
-            onClick = onClick
+            onClick = onClick,
+            modifier = Modifier.dpadFocusIndicator(CircleShape)
         ) {
             Text(stringResource(text))
         }
