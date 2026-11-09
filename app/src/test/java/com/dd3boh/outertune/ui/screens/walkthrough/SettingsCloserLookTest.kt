@@ -76,8 +76,12 @@ class SettingsCloserLookTest {
             if (route in toured) assertNull("$route has stops and is also listed as left out", why)
             else assertTrue("$route has no stop and is not listed as left out", !why.isNullOrBlank())
         }
-        val activeLeftOut = CLOSER_LOOK_LEFT_OUT.keys.filter { it in SETTINGS_CATEGORIES }
-        assertTrue("a left-out screen is not a Settings category", SETTINGS_CATEGORIES.containsAll(activeLeftOut))
+        val inactive = buildSet {
+            if (!Unreleased.WIDGETS_PAGE) add("settings/widgets")
+            if (!Unreleased.BATTERY_MODES) add("settings/battery")
+        }
+        val orphaned = CLOSER_LOOK_LEFT_OUT.keys - SETTINGS_CATEGORIES.toSet()
+        assertTrue("left out, and not a category: ${orphaned - inactive}", inactive.containsAll(orphaned))
         // Four left out of sixteen since Widgets (4 Nov 2026): its cards are the widgets on the home screen, none a setting of the app.
         assertTrue("a tour of the settings with most of them left out", toured.size >= SETTINGS_CATEGORIES.size - 4)
     }
