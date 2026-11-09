@@ -540,10 +540,27 @@ fun Modifier.dpadOverlayEscape(tvNavigation: Boolean = false): Modifier = compos
         if (tvNavigation) {
             val owner = (view as? RootForTest)?.semanticsOwner ?: return@onPreviewKeyEvent false
 
+            val focusedEditable = focusedNodeIsEditable(owner.unmergedRootSemanticsNode)
+
             // Left/right inside an editable field belong to text editing, not focus traversal.
             if ((direction == DpadDirection.Left || direction == DpadDirection.Right) &&
-                focusedNodeIsEditable(owner.unmergedRootSemanticsNode)
+                focusedEditable
             ) return@onPreviewKeyEvent false
+
+            // After Back closes the TV search keyboard, focus intentionally remains on the
+            // search field. Compose's local focus search can keep that focus trapped there;
+            // hand Down directly to the screen-wide geometry search so the first visible
+            // destination item below the search receives focus.
+            if (direction == DpadDirection.Down && focusedEditable) {
+                return@onPreviewKeyEvent when (
+                    moveFromOverlay(owner.unmergedRootSemanticsNode, direction, fromAnywhere = true)
+                ) {
+                    DpadMove.Moved -> true
+                    DpadMove.NotOurs -> false
+                    DpadMove.NothingThere -> scrollListInstead(view, direction)
+                    DpadMove.Covered -> true
+                }
+            }
 
             if (overlaysFocused.get() == 0) {
                 val nativeDirection = when (direction) {
