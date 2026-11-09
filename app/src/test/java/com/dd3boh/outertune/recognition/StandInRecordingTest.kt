@@ -38,7 +38,7 @@ class StandInRecordingTest {
         File(dir, "room.pcm").writeBytes(bytes.array())
         return MicrophoneListener(object : ContextWrapper(null) {
             override fun getFilesDir(): File = dir
-        })
+        }, File(dir, "room.pcm"))
     }
 
     /** [count] samples all over the range, the negative ones included. */
