@@ -116,7 +116,7 @@ class WebStreamHeadersTest {
             reads,
         )
         val walk = code(File(sources, "utils/YTPlayerUtils.kt").readText())
-        assertTrue(Regex("""val trialOn = Unreleased\.WEB_CLIENT_FIRST && askWebClientFirst""").containsMatchIn(walk))
+        assertTrue(Regex("""val trialOn = \(webClientFirstEnabledOverride \?: Unreleased\.WEB_CLIENT_FIRST\) && askWebClientFirst""").containsMatchIn(walk))
         // And none of the three places that fetch a stream puts the headers on for itself, where
         // one could again be left out: StreamFamily.Calls does it for all of them.
         for (path in listOf("utils/YTPlayerUtils.kt", "playback/MusicService.kt", "playback/DownloadUtil.kt")) {
