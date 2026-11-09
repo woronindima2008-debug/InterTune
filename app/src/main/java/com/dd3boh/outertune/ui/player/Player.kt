@@ -1693,6 +1693,7 @@ fun BottomSheetPlayer(
                     maxControlsFraction = if (tvBuild) 0.78f else 0.62f,
                     slot = if (tvBuild) 48.dp else LandscapeTransportSlot,
                     playButtonGap = if (tvBuild) 6.dp else PlayButtonGap,
+                    mustFitControls = tvBuild,
                 )
                 Row(modifier = Modifier.fillMaxSize()) {
                     // The queue sheet's peek is reserved on the controls column alone, not on this
@@ -2090,14 +2091,15 @@ internal fun landscapeControlsWidth(
     maxControlsFraction: Float = 0.62f,
     slot: Dp = LandscapeTransportSlot,
     playButtonGap: Dp = PlayButtonGap,
+    mustFitControls: Boolean = false,
 ): Dp {
     val needed = slot * slots + playButton + playButtonGap * 2 + gutter * 2
     val maxFraction = maxControlsFraction.coerceIn(0.5f, 0.9f)
     val balanced = (available / 2).coerceAtLeast(needed)
-    // The fraction is a preference for the artwork, not a hard limit that may cut off
-    // the last transport buttons. When the complete control row needs more room, let it
-    // take that room first; only the artwork/lyrics pane gives up width.
-    return if (balanced > available * maxFraction) balanced.coerceAtMost(available) else balanced
+    // On TV the complete remote-control row takes priority over the artwork/lyrics pane:
+    // never enforce the artwork fraction by cutting off the rightmost transport buttons.
+    return if (mustFitControls) balanced.coerceAtMost(available)
+    else balanced.coerceAtMost(available * maxFraction)
 }
 
 /**
