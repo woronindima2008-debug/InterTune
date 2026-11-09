@@ -50,7 +50,7 @@ jobs:
           profile: tv_1080p
           enable-hw-keyboard: true
           disable-animations: true
-          script: ./gradlew connectedCoreTvAndroidTest --stacktrace -DskipFormatKtlint
+          script: ./gradlew connectedCoreTvAndroidTest --stacktrace -DskipFormatKtlint -PenableTvUiTestManifest=true
 
       - name: Upload unit and UI test reports
         if: always()
