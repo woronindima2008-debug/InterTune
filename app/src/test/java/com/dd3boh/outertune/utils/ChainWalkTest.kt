@@ -97,6 +97,7 @@ class ChainWalkTest {
         // The chain as it was without VISIONOS's other identities, which the tests that are about them put in.
         YTPlayerUtils.identitiesInChain = false
         YTPlayerUtils.askWebClientFirst = false
+        YTPlayerUtils.webClientFirstEnabledOverride = null
         YTPlayerUtils.forgetWhatTheTrialLearned()
         YTPlayerUtils.streamMemory = Memory()
         YTPlayerUtils.onStreamMemoryChanged = { stored += it }
@@ -121,6 +122,7 @@ class ChainWalkTest {
         YTPlayerUtils.authMode = PlaybackAuthMode.WHEN_REFUSED
         YTPlayerUtils.identitiesInChain = Unreleased.VISIONOS_IDENTITIES
         YTPlayerUtils.askWebClientFirst = false
+        YTPlayerUtils.webClientFirstEnabledOverride = null
         YTPlayerUtils.forgetWhatTheTrialLearned()
         YTPlayerUtils.streamMemory = Memory()
         YTPlayerUtils.onStreamMemoryChanged = null
@@ -1326,6 +1328,7 @@ class ChainWalkTest {
     /** As on any phone in October 2026, with the experiment's switch on: VISIONOS served last and would be asked first. */
     private fun experimentOn(): Memory {
         remembering("VISIONOS", "ANDROID_VR")
+        YTPlayerUtils.webClientFirstEnabledOverride = true
         YTPlayerUtils.askWebClientFirst = true
         return YTPlayerUtils.streamMemory
     }
