@@ -563,7 +563,10 @@ fun Modifier.dpadOverlayEscape(tvNavigation: Boolean = false): Modifier = compos
                     DpadMove.NotOurs -> focusManager.moveFocus(FocusDirection.Down)
                     DpadMove.NothingThere -> scrollListInstead(view, direction) ||
                         focusManager.moveFocus(FocusDirection.Down)
-                    DpadMove.Covered -> true
+                    // The expanded search covers the page, but Down on its editable field
+                    // must reach the field's preview handler. It closes the search and retries
+                    // focus after the overlay has left composition.
+                    DpadMove.Covered -> false
                 }
             }
 
@@ -728,6 +731,15 @@ private fun focusTabBar(view: View): Boolean {
 private fun dpadMove(view: View, direction: DpadDirection?, fromAnywhere: Boolean): Boolean {
     val owner = (view as? RootForTest)?.semanticsOwner ?: return false
     return moveFromOverlay(owner.unmergedRootSemanticsNode, direction, fromAnywhere) == DpadMove.Moved
+}
+
+/**
+ * Retries a D-pad move after a floating surface has been dismissed. The caller waits for a frame
+ * so the dismissed surface is no longer part of the semantics tree before searching the page.
+ */
+internal fun moveDpadFocusFromAnywhere(view: View, direction: DpadDirection): Boolean {
+    val owner = (view as? RootForTest)?.semanticsOwner ?: return false
+    return moveFromOverlay(owner.unmergedRootSemanticsNode, direction, fromAnywhere = true) == DpadMove.Moved
 }
 
 /**
