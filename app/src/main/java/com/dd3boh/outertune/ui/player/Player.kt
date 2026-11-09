@@ -2093,7 +2093,11 @@ internal fun landscapeControlsWidth(
 ): Dp {
     val needed = slot * slots + playButton + playButtonGap * 2 + gutter * 2
     val maxFraction = maxControlsFraction.coerceIn(0.5f, 0.9f)
-    return (available / 2).coerceAtLeast(needed).coerceAtMost(available * maxFraction)
+    val balanced = (available / 2).coerceAtLeast(needed)
+    // The fraction is a preference for the artwork, not a hard limit that may cut off
+    // the last transport buttons. When the complete control row needs more room, let it
+    // take that room first; only the artwork/lyrics pane gives up width.
+    return if (balanced > available * maxFraction) balanced.coerceAtMost(available) else balanced
 }
 
 /**
