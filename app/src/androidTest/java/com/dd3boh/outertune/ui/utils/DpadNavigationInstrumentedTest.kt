@@ -229,7 +229,6 @@ class DpadNavigationInstrumentedTest {
             val inputModeManager = LocalInputModeManager.current
             LaunchedEffect(Unit) {
                 inputModeManager.requestInputMode(InputMode.Keyboard)
-                firstFocus.requestFocus()
             }
             MaterialTheme {
                 GridMenu(Modifier.width(400.dp).height(260.dp)) {
@@ -248,8 +247,15 @@ class DpadNavigationInstrumentedTest {
             }
         }
 
-        composeRule.waitForIdle()
-        composeRule.onNodeWithTag("grid-item-0").assertIsFocused()
+        // LazyVerticalGrid composes its first item after the parent content is installed.
+        // Request focus only once that lazy item has attached its FocusRequester; otherwise the
+        // first request can race composition and leave the test at the unfocused root.
+        composeRule.waitUntil(5_000) {
+            runCatching {
+                firstFocus.requestFocus()
+                composeRule.onNodeWithTag("grid-item-0").assertIsFocused()
+            }.isSuccess
+        }
         composeRule.onNodeWithTag("grid-item-0").performKeyInput {
             keyDown(Key.DirectionDown)
             keyUp(Key.DirectionDown)
