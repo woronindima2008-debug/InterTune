@@ -251,6 +251,7 @@ import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.FocusRequester
 import androidx.activity.compose.BackHandler
 import com.dd3boh.outertune.ui.utils.dpadOverlay
+import com.dd3boh.outertune.ui.utils.dpadFocusIndicator
 import com.dd3boh.outertune.ui.utils.dpadOverlayEscape
 import com.dd3boh.outertune.ui.utils.tvRemoteCursor
 import com.dd3boh.outertune.ui.utils.TvRemoteCursorState
@@ -2200,11 +2201,13 @@ class MainActivity : ComponentActivity() {
                                             // Only the library tab is pointed at, so only it is
                                             // reported. Tagging every tab would have four of them
                                             // writing bounds on every recomposition of the bar.
-                                            modifier = (if (screen.route == Screens.Library.route) {
-                                                Modifier.tourTarget(Tour.NAV_LIBRARY)
-                                            } else Modifier).then(
-                                                if (tabSelected) Modifier.focusRequester(selectedTabFocus) else Modifier
-                                            ).then(
+                                            modifier = Modifier
+                                                .dpadFocusIndicator()
+                                                .then(if (screen.route == Screens.Library.route) {
+                                                    Modifier.tourTarget(Tour.NAV_LIBRARY)
+                                                } else Modifier)
+                                                .then(if (tabSelected) Modifier.focusRequester(selectedTabFocus) else Modifier)
+                                                .then(
                                                 if (slimNav) Modifier.semantics { contentDescription = tabName } else Modifier
                                             ),
                                             selected = tabSelected,
@@ -2319,7 +2322,9 @@ class MainActivity : ComponentActivity() {
                                         val tabName = stringResource(screen.titleId)
                                         val tabSelected = navBackStackEntry?.destination?.hierarchy?.any { it.route == screen.route } == true
                                         NavigationRailItem(
-                                            modifier = (if (tabSelected) Modifier.focusRequester(selectedTabFocus) else Modifier)
+                                            modifier = Modifier
+                                                .dpadFocusIndicator()
+                                                .then(if (tabSelected) Modifier.focusRequester(selectedTabFocus) else Modifier)
                                                 .then(if (slimNav) Modifier.semantics { contentDescription = tabName } else Modifier),
                                             selected = tabSelected,
                                             icon = {
