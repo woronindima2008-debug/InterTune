@@ -67,6 +67,7 @@ fun IconLabelButton(
         .clip(RoundedCornerShape(MenuCornerRadius))
         .background(background)
         .clickable { onClick() }
+        .dpadFocusIndicator(RoundedCornerShape(MenuCornerRadius))
         .padding(horizontal = 8.dp)
 ) {
     Icon(
