@@ -1,0 +1,580 @@
+package com.dd3boh.outertune.ui.menu
+
+import com.dd3boh.outertune.ui.utils.dpadFocusIndicator
+import android.app.SearchManager
+import android.content.ClipData
+import android.content.ClipboardManager
+import android.content.Intent
+import android.os.Build
+import android.widget.Toast
+import androidx.compose.animation.animateContentSize
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.asPaddingValues
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.systemBars
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.AvTimer
+import androidx.compose.material.icons.rounded.ContentCopy
+import androidx.compose.material.icons.rounded.Delete
+import androidx.compose.material.icons.rounded.Edit
+import androidx.compose.material.icons.rounded.ExpandLess
+import androidx.compose.material.icons.rounded.ExpandMore
+import androidx.compose.material.icons.rounded.FormatQuote
+import androidx.compose.material.icons.rounded.Search
+import androidx.compose.material.icons.rounded.Settings
+import androidx.compose.material.icons.rounded.Share
+import androidx.compose.material.icons.rounded.Sync
+import androidx.compose.material.icons.rounded.SyncAlt
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.input.TextFieldValue
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.dp
+import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
+import com.dd3boh.outertune.LocalDatabase
+import com.dd3boh.outertune.R
+import com.dd3boh.outertune.constants.LyricTrimKey
+import com.dd3boh.outertune.constants.MultilineLrcKey
+import com.dd3boh.outertune.db.entities.LyricsEntity
+import com.dd3boh.outertune.extensions.isInternetConnected
+import com.dd3boh.outertune.db.entities.LyricsEntity.Companion.uninitializedLyric
+import com.dd3boh.outertune.lyrics.LyricsHelper
+import com.dd3boh.outertune.lyrics.LyricsShare
+import com.dd3boh.outertune.lyrics.lyricsPreview
+import com.dd3boh.outertune.lyrics.readKeptLyrics
+import com.dd3boh.outertune.models.MediaMetadata
+import com.dd3boh.outertune.ui.component.PreferenceGroupTitle
+import com.dd3boh.outertune.ui.component.SettingsClickToReveal
+import com.dd3boh.outertune.ui.component.button.IconButton
+import com.dd3boh.outertune.ui.dialog.DefaultDialog
+import com.dd3boh.outertune.ui.dialog.ListDialog
+import com.dd3boh.outertune.ui.dialog.TextFieldDialog
+import com.dd3boh.outertune.ui.screens.settings.fragments.LyricFormatFrag
+import com.dd3boh.outertune.ui.screens.settings.fragments.LyricParserFrag
+import com.dd3boh.outertune.ui.screens.settings.fragments.LyricSourceFrag
+import com.dd3boh.outertune.utils.rememberPreference
+import com.dd3boh.outertune.utils.shareSheet
+import com.dd3boh.outertune.viewmodels.LyricsMenuViewModel
+import org.akanework.gramophone.logic.utils.SemanticLyrics
+import com.dd3boh.outertune.utils.Toaster
+
+
+@Composable
+fun LyricsMenu(
+    lyricsProvider: suspend () -> LyricsEntity?,
+    mediaMetadataProvider: () -> MediaMetadata,
+    onDismiss: () -> Unit,
+    viewModel: LyricsMenuViewModel = hiltViewModel(),
+    onRefreshRequest: (SemanticLyrics?) -> Unit,
+    /** The lyrics as the view shows them, a line each, or null while it shows none. */
+    shownLines: () -> List<String>? = { null },
+    /** Starts picking lines in the view, for a picture of them. */
+    onPickLines: () -> Unit = {},
+    /** True when the picked lines can be a video too: the lyrics are synced. */
+    picksForVideo: Boolean = false,
+    /** Opens the bar that moves the lyrics earlier or later against the song; null for lyrics that are not synced. */
+    onAdjustTiming: (() -> Unit)? = null,
+    /** The lyrics of the song with this id were replaced: picked in Search, refetched as other lyrics, or deleted. */
+    onOtherLyrics: (String) -> Unit = {},
+) {
+    val context = LocalContext.current
+    val database = LocalDatabase.current
+    // Copy and Share take the lyrics as they are on screen, so they are there for lyrics from a
+    // file or a provider alike, with or without a row of their own.
+    val shown = shownLines()?.takeIf { lines -> lines.any { it.isNotBlank() } }
+
+    val multilineLrc by rememberPreference(MultilineLrcKey, defaultValue = true)
+    val lyricTrim by rememberPreference(LyricTrimKey, defaultValue = false)
+
+    // The row is observed, not read in composition. That read blocked the main thread and ran
+    // again on every recomposition, every keystroke in Search included. Room runs the query off
+    // the main thread.
+    //
+    // A flow rather than one read, because Edit saves while this menu stays open: its onDone
+    // upserts the row and closes only the text field dialog. A second Edit has to start from the
+    // saved text, and Delete has to appear once a song with no row has one.
+    val dbRow by remember(mediaMetadataProvider().id) {
+        database.lyrics(mediaMetadataProvider().id)
+    }.collectAsState(initial = null)
+
+    // For a song with no row, the .lrc file is the fallback, read once off the main thread. The
+    // provider returns the row first when there is one, so once lyricsLoaded is true the database
+    // has been asked as well. Edit waits for that read, since TextFieldDialog keeps the first
+    // value it gets and would otherwise start empty for good.
+    var localFallback by remember(mediaMetadataProvider().id) { mutableStateOf<LyricsEntity?>(null) }
+    var lyricsLoaded by remember(mediaMetadataProvider().id) { mutableStateOf(false) }
+    LaunchedEffect(mediaMetadataProvider().id) {
+        localFallback = lyricsProvider()
+        lyricsLoaded = true
+    }
+
+    val dbLyric = dbRow ?: localFallback
+
+    var showEditDialog by rememberSaveable {
+        mutableStateOf(false)
+    }
+
+    if (showEditDialog) {
+        TextFieldDialog(
+            onDismiss = { showEditDialog = false },
+            icon = { Icon(imageVector = Icons.Rounded.Edit, contentDescription = null) },
+            title = { Text(text = mediaMetadataProvider().title) },
+            initialTextFieldValue = TextFieldValue(dbLyric?.lyrics.orEmpty()),
+            singleLine = false,
+            onDone = {
+                database.query {
+                    upsert(
+                        LyricsEntity(
+                            id = mediaMetadataProvider().id,
+                            lyrics = it
+                        )
+                    )
+                }
+                onRefreshRequest(readKeptLyrics(it, lyricTrim, multilineLrc))
+            }
+        )
+    }
+
+    var showSearchDialog by rememberSaveable {
+        mutableStateOf(false)
+    }
+    var showSearchResultDialog by rememberSaveable {
+        mutableStateOf(false)
+    }
+
+    val searchMediaMetadata = remember(showSearchDialog) {
+        mediaMetadataProvider()
+    }
+    val (titleField, onTitleFieldChange) = rememberSaveable(showSearchDialog, stateSaver = TextFieldValue.Saver) {
+        mutableStateOf(
+            TextFieldValue(
+                text = mediaMetadataProvider().title
+            )
+        )
+    }
+    val (artistField, onArtistFieldChange) = rememberSaveable(showSearchDialog, stateSaver = TextFieldValue.Saver) {
+        mutableStateOf(
+            TextFieldValue(
+                text = mediaMetadataProvider().artists.joinToString { it.name }
+            )
+        )
+    }
+
+    // Out of sight while its results are up, so they do not sit on top of its fields (his screen,
+    // 1 Nov 2026); back from the results brings it back as it was typed, to search again.
+    if (showSearchDialog && !showSearchResultDialog) {
+        DefaultDialog(
+            scrollable = true,
+            onDismiss = { showSearchDialog = false },
+            icon = { Icon(imageVector = Icons.Rounded.Search, contentDescription = null) },
+            title = { Text(stringResource(R.string.search_lyrics)) },
+            buttons = {
+                TextButton(
+                    modifier = Modifier.dpadFocusIndicator(),
+onClick = { showSearchDialog = false }
+                ) {
+                    Text(stringResource(android.R.string.cancel))
+                }
+
+                Spacer(Modifier.width(8.dp))
+
+                TextButton(
+                    modifier = Modifier.dpadFocusIndicator(),
+onClick = {
+                        showSearchDialog = false
+                        onDismiss()
+                        try {
+                            context.startActivity(
+                                Intent(Intent.ACTION_WEB_SEARCH).apply {
+                                    putExtra(SearchManager.QUERY, "${artistField.text} ${titleField.text} lyrics")
+                                }
+                            )
+                        } catch (_: Exception) {
+                        }
+                    }
+                ) {
+                    Text(stringResource(R.string.search_online))
+                }
+
+                Spacer(Modifier.width(8.dp))
+
+                TextButton(
+                    modifier = Modifier.dpadFocusIndicator(),
+onClick = {
+                        viewModel.search(
+                            searchMediaMetadata.id,
+                            titleField.text,
+                            artistField.text,
+                            searchMediaMetadata.duration
+                        )
+                        showSearchResultDialog = true
+                    }
+                ) {
+                    Text(stringResource(android.R.string.ok))
+                }
+            }
+        ) {
+            OutlinedTextField(
+                value = titleField,
+                onValueChange = onTitleFieldChange,
+                singleLine = true,
+                label = { Text(stringResource(R.string.song_title)) },
+                // Both fields as wide as the dialog: a long title widened its own field only.
+                modifier = Modifier.fillMaxWidth()
+            )
+
+            Spacer(Modifier.height(12.dp))
+
+            OutlinedTextField(
+                value = artistField,
+                onValueChange = onArtistFieldChange,
+                singleLine = true,
+                label = { Text(stringResource(R.string.song_artists)) },
+                modifier = Modifier.fillMaxWidth()
+            )
+        }
+    }
+
+    if (showSearchResultDialog) {
+        val results by viewModel.results.collectAsState()
+        val isLoading by viewModel.isLoading.collectAsState()
+
+        var expandedItemIndex by rememberSaveable {
+            mutableIntStateOf(-1)
+        }
+
+        ListDialog(
+            onDismiss = { showSearchResultDialog = false }
+        ) {
+            itemsIndexed(results) { index, result ->
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable {
+                            onDismiss()
+                            viewModel.cancelSearch()
+                            database.query {
+                                upsert(
+                                    LyricsEntity(
+                                        id = searchMediaMetadata.id,
+                                        lyrics = result.lyrics
+                                    )
+                                )
+                            }
+
+                            onRefreshRequest(readKeptLyrics(result.lyrics, lyricTrim, multilineLrc))
+                            onOtherLyrics(searchMediaMetadata.id)
+                        }
+                        .padding(12.dp)
+                        .animateContentSize()
+                ) {
+                    Column(
+                        modifier = Modifier.weight(1f)
+                    ) {
+                        Text(
+                            text = remember(result.lyrics) { lyricsPreview(result.lyrics) },
+                            style = MaterialTheme.typography.bodyMedium,
+                            maxLines = if (index == expandedItemIndex) Int.MAX_VALUE else 2,
+                            overflow = TextOverflow.Ellipsis,
+                            modifier = Modifier.padding(bottom = 4.dp)
+                        )
+
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                text = result.providerName,
+                                style = MaterialTheme.typography.labelMedium,
+                                color = MaterialTheme.colorScheme.secondary,
+                                maxLines = 1
+                            )
+                            if (result.lyrics.startsWith("[")) {
+                                Icon(
+                                    imageVector = Icons.Rounded.Sync,
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.secondary,
+                                    modifier = Modifier
+                                        .padding(start = 4.dp)
+                                        .size(18.dp)
+                                )
+                            }
+                        }
+                    }
+
+                    IconButton(
+                        onClick = {
+                            expandedItemIndex = if (expandedItemIndex == index) -1 else index
+                        }
+                    ) {
+                        Icon(
+                            imageVector = if (index == expandedItemIndex) Icons.Rounded.ExpandLess else Icons.Rounded.ExpandMore,
+                            contentDescription = null
+                        )
+                    }
+                }
+            }
+
+            if (isLoading) {
+                item {
+                    Box(
+                        contentAlignment = Alignment.Center,
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        CircularProgressIndicator()
+                    }
+                }
+            }
+
+            if (!isLoading && results.isEmpty()) {
+                item {
+                    Text(
+                        text = if (!context.isInternetConnected()) {
+                            context.getString(R.string.error_no_internet)
+                        } else {
+                            context.getString(R.string.lyrics_not_found)
+                        },
+                        textAlign = TextAlign.Center,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                    )
+                }
+            }
+        }
+    }
+
+    var showDeleteLyric by remember {
+        mutableStateOf(false)
+    }
+
+    if (showDeleteLyric) {
+        DefaultDialog(
+            onDismiss = { showDeleteLyric = false },
+            content = {
+                Text(
+                    text = stringResource(R.string.delete_lyric_confirm, mediaMetadataProvider().title),
+                    style = MaterialTheme.typography.bodyLarge,
+                    modifier = Modifier.padding(horizontal = 18.dp)
+                )
+            },
+            buttons = {
+                TextButton(
+                    modifier = Modifier.dpadFocusIndicator(),
+onClick = {
+                        showDeleteLyric = false
+                    }
+                ) {
+                    Text(text = stringResource(android.R.string.cancel))
+                }
+
+                TextButton(
+                    modifier = Modifier.dpadFocusIndicator(),
+onClick = {
+                        showDeleteLyric = false
+                        onDismiss()
+
+                        dbLyric?.let {
+                            database.query {
+                                delete(it)
+                            }
+                            // Their move goes with them: the lyrics found next start as they come.
+                            onOtherLyrics(it.id)
+                        }
+                    }
+                ) {
+                    Text(text = stringResource(android.R.string.ok))
+                }
+            }
+        )
+    }
+
+    var showSettings by remember {
+        mutableStateOf(false)
+    }
+    if (showSettings) {
+        DefaultDialog(
+            onDismiss = { showSettings = false },
+            content = {
+                Column(
+                    modifier = Modifier
+                        .weight(1f, false)
+                        .verticalScroll(rememberScrollState())
+                ) {
+                    Text(
+                        text = stringResource(R.string.settings),
+                        style = MaterialTheme.typography.bodyLarge,
+                        modifier = Modifier.padding(horizontal = 18.dp)
+                    )
+                    PreferenceGroupTitle(
+                        title = stringResource(R.string.grp_lyrics_format)
+                    )
+                    LyricFormatFrag()
+
+                    SettingsClickToReveal(stringResource(R.string.more_settings)) {
+                        PreferenceGroupTitle(
+                            title = stringResource(R.string.grp_lyrics_source)
+                        )
+                        LyricSourceFrag()
+
+                        PreferenceGroupTitle(
+                            title = stringResource(R.string.grp_lyrics_parser)
+                        )
+                        LyricParserFrag()
+                    }
+                }
+            },
+            buttons = {
+                TextButton(
+                    modifier = Modifier.dpadFocusIndicator(),
+onClick = {
+                        showSettings = false
+                    }
+                ) {
+                    Text(text = stringResource(android.R.string.ok))
+                }
+            }
+        )
+    }
+
+    GridMenu(
+        contentPadding = PaddingValues(
+            start = 8.dp,
+            top = 8.dp,
+            end = 8.dp,
+            bottom = 8.dp + WindowInsets.systemBars.asPaddingValues().calculateBottomPadding()
+        )
+    ) {
+        GridMenuItem(
+            icon = Icons.Rounded.Edit,
+            title = R.string.edit
+        ) {
+            // See lyricsLoaded above: opening this before the first answer arrives would seed the
+            // text field with "no lyrics yet" for good, however quickly the real answer follows.
+            if (lyricsLoaded) showEditDialog = true
+        }
+        GridMenuItem(
+            icon = Icons.Rounded.SyncAlt,
+            title = R.string.refetch
+        ) {
+            val song = mediaMetadataProvider()
+            // Other lyrics than the ones there start as they come, as a pick in Search does: a
+            // move made for the old lines played the new ones late. The same lyrics keep it.
+            val before = dbLyric?.lyrics?.let { readKeptLyrics(it, lyricTrim, multilineLrc) }
+            onDismiss()
+            viewModel.refetchLyrics(song) { result ->
+                when (result) {
+                    is LyricsHelper.Refetched.Found -> {
+                        onRefreshRequest(result.lyrics)
+                        if (result.lyrics != before) onOtherLyrics(song.id)
+                    }
+                    // What is on screen stays as it is, and the toast says why nothing changed.
+                    // The view was handed nothing here, which it draws as the loading placeholder,
+                    // and that stayed until the song changed.
+                    LyricsHelper.Refetched.NoneFound -> Toaster.show(
+                        context,
+                        if (before != null && before != uninitializedLyric) R.string.lyrics_refetch_none else R.string.lyrics_not_found,
+                        Toast.LENGTH_SHORT,
+                    )
+                    LyricsHelper.Refetched.Failed -> Toaster.show(context, R.string.lyrics_refetch_failed, Toast.LENGTH_LONG)
+                }
+            }
+        }
+        GridMenuItem(
+            icon = Icons.Rounded.Search,
+            title = R.string.search,
+        ) {
+            showSearchDialog = true
+        }
+        if (dbLyric != null) {
+            // TODO: hide this for when lrc exists and lyrics is not in the database
+            GridMenuItem(
+                icon = Icons.Rounded.Delete,
+                title = R.string.delete,
+            ) {
+                showDeleteLyric = true
+            }
+        }
+
+        GridMenuItem(
+            icon = Icons.Rounded.Settings,
+            title = R.string.settings,
+        ) {
+            showSettings = true
+        }
+
+        // After the entries that were here, which stay where hands know them.
+        GridMenuItem(
+            icon = Icons.Rounded.ContentCopy,
+            title = R.string.lyrics_copy,
+            enabled = shown != null,
+        ) {
+            val song = mediaMetadataProvider()
+            context.getSystemService(ClipboardManager::class.java)
+                ?.setPrimaryClip(ClipData.newPlainText(song.title, LyricsShare.text(shown.orEmpty())))
+            // Android 13 and later show their own confirmation for every copy.
+            if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) {
+                Toaster.show(context, R.string.lyrics_copied, Toast.LENGTH_SHORT)
+            }
+            onDismiss()
+        }
+        GridMenuItem(
+            icon = Icons.Rounded.Share,
+            title = R.string.lyrics_share,
+            enabled = shown != null,
+        ) {
+            val song = mediaMetadataProvider()
+            val send = Intent(Intent.ACTION_SEND).apply {
+                type = "text/plain"
+                putExtra(Intent.EXTRA_TEXT, LyricsShare.message(song.title, song.artists.joinToString { it.name }, shown.orEmpty()))
+                putExtra(Intent.EXTRA_TITLE, song.title)
+            }
+            onDismiss()
+            context.startActivity(context.shareSheet(send))
+        }
+        GridMenuItem(
+            icon = Icons.Rounded.FormatQuote,
+            title = if (picksForVideo) R.string.lyrics_share_picture_or_video else R.string.lyrics_share_picture,
+            enabled = shown != null,
+        ) {
+            onDismiss()
+            onPickLines()
+        }
+        if (onAdjustTiming != null) GridMenuItem(
+            icon = Icons.Rounded.AvTimer,
+            title = R.string.lyrics_timing,
+        ) {
+            onDismiss()
+            onAdjustTiming()
+        }
+    }
+}

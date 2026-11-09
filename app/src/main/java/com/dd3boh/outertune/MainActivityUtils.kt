@@ -1,0 +1,325 @@
+package com.dd3boh.outertune
+
+import android.content.Context
+import android.content.pm.PackageManager
+import android.net.Uri
+import android.util.Log
+import androidx.compose.material3.SnackbarDuration
+import androidx.compose.material3.SnackbarHostState
+import androidx.datastore.preferences.core.edit
+import androidx.navigation.NavController
+import com.dd3boh.outertune.constants.PlayOrigin
+import com.dd3boh.outertune.constants.AUTO_SCAN_COOLDOWN
+import com.dd3boh.outertune.constants.AUTO_SCAN_SOFT_COOLDOWN
+import com.dd3boh.outertune.constants.AutomaticScannerKey
+import com.dd3boh.outertune.constants.ExcludedScanPathsKey
+import com.dd3boh.outertune.constants.LastLocalScanKey
+import com.dd3boh.outertune.constants.LocalMediaPermissionAskedKey
+import com.dd3boh.outertune.constants.LastVersionKey
+import com.dd3boh.outertune.constants.LocalLibraryEnableKey
+import com.dd3boh.outertune.constants.LookupYtmArtistsKey
+import com.dd3boh.outertune.constants.OOBE_VERSION
+import com.dd3boh.outertune.constants.OobeStatusKey
+import com.dd3boh.outertune.constants.SCANNER_OWNER_LM
+import com.dd3boh.outertune.constants.ScanPathsKey
+import com.dd3boh.outertune.constants.ScannerImpl
+import com.dd3boh.outertune.constants.ScannerImplKey
+import com.dd3boh.outertune.constants.ScannerMatchCriteria
+import com.dd3boh.outertune.constants.ScannerSensitivityKey
+import com.dd3boh.outertune.constants.ScannerStrictExtKey
+import com.dd3boh.outertune.constants.ScannerStrictFilePathsKey
+import com.dd3boh.outertune.constants.UpdateAvailableKey
+import com.dd3boh.outertune.db.MusicDatabase
+import com.dd3boh.outertune.models.toMediaMetadata
+import com.dd3boh.outertune.playback.DownloadUtil
+import com.dd3boh.outertune.playback.PlayerConnection
+import com.dd3boh.outertune.playback.queues.ListQueue
+import com.dd3boh.outertune.ui.utils.MEDIA_PERMISSION_LEVEL
+import com.dd3boh.outertune.ui.utils.MediaPermissionAsk
+import com.dd3boh.outertune.ui.utils.clearDtCache
+import com.dd3boh.outertune.utils.compareVersion
+import com.dd3boh.outertune.utils.dataStore
+import com.dd3boh.outertune.utils.enumPreference
+import com.dd3boh.outertune.utils.get
+import com.dd3boh.outertune.utils.lmScannerCoroutine
+import com.dd3boh.outertune.utils.YouTubeLink
+import com.dd3boh.outertune.utils.reportException
+import com.dd3boh.outertune.utils.scanners.LocalMediaScanner
+import com.dd3boh.outertune.utils.scanners.LocalMediaScanner.Companion.destroyScanner
+import com.dd3boh.outertune.utils.scanners.LocalMediaScanner.Companion.scannerState
+import com.dd3boh.outertune.utils.scanners.ScannerAbortException
+import com.dd3boh.outertune.utils.scanners.uriListFromString
+import com.dd3boh.outertune.ui.menu.MenuState
+import com.dd3boh.outertune.ui.menu.YouTubeSongMenu
+import com.zionhuang.innertube.YouTube
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import java.time.LocalDateTime
+import java.time.ZoneOffset
+
+
+/**
+ * Directly navigate to a YouTube page given an YouTube url
+ */
+fun youtubeNavigator(
+    context: Context,
+    navController: NavController,
+    coroutineScope: CoroutineScope,
+    playerConnection: PlayerConnection?,
+    snackbarHostState: SnackbarHostState,
+    uri: Uri,
+    /** Where a song with no album opens: its menu. Without one, such a song plays as before. */
+    menuState: MenuState? = null,
+): Boolean {
+    // Only a YouTube address, and true only when something was opened: see YouTubeLink.parse.
+    when (val link = YouTubeLink.parse(uri.toString()) ?: return false) {
+        is YouTubeLink.Playlist -> if (link.id.startsWith("OLAK5uy_")) {
+            coroutineScope.launch {
+                YouTube.albumSongs(link.id).onSuccess { songs ->
+                    songs.firstOrNull()?.album?.id?.let { browseId ->
+                        navController.navigate("album/$browseId")
+                    }
+                }.onFailure {
+                    reportException(it)
+                }
+            }
+        } else {
+            navController.navigate("online_playlist/${link.id}")
+        }
+
+        is YouTubeLink.Channel -> navController.navigate("artist/${link.id}")
+
+        is YouTubeLink.Album -> navController.navigate("album/${link.id}")
+
+        is YouTubeLink.Video -> coroutineScope.launch {
+            withContext(Dispatchers.IO) {
+                YouTube.queue(listOf(link.id), link.playlistId)
+            }.onSuccess {
+                val s = it.firstOrNull()
+                if (s == null) {
+                    coroutineScope.launch {
+                        snackbarHostState.showSnackbar(
+                            message = context.getString(R.string.err_invalid_ytm_song),
+                            withDismissAction = true,
+                            duration = SnackbarDuration.Long
+                        )
+                    }
+                } else if (!link.playNow && s.album != null) {
+                    // A song link opens the song in its album, brought into view and lit, and the
+                    // listener chooses: play it, queue it, add it to a playlist (his ask, 21 Oct 2026).
+                    navController.navigate("album/${s.album!!.id}?song=${s.id}")
+                } else if (!link.playNow && menuState != null) {
+                    // A song with no album, a video for one: its menu, with the same choices.
+                    menuState.show {
+                        YouTubeSongMenu(song = s, navController = navController, onDismiss = menuState::dismiss)
+                    }
+                } else {
+                    playerConnection?.playQueue(
+                        queue = ListQueue(
+                            title = s.title,
+                            items = listOf(s.toMediaMetadata())
+                        ),
+                        // A link opened from another app.
+                        origin = PlayOrigin.EXTERNAL,
+                    )
+                }
+            }.onFailure {
+                reportException(it)
+            }
+        }
+    }
+
+    return true
+}
+
+suspend fun scanInit(
+    context: Context,
+    database: MusicDatabase,
+    downloadUtil: DownloadUtil,
+    coroutineScope: CoroutineScope,
+    playerConnection: PlayerConnection?,
+    snackbarHostState: SnackbarHostState
+) {
+    val MAIN_TAG = "MainOtActivity"
+    val oobeStatus = context.dataStore.get(OobeStatusKey, defaultValue = 0)
+    val localLibEnable = context.dataStore.get(LocalLibraryEnableKey, defaultValue = true)
+    val ds = context.dataStore.data.first()[ScannerSensitivityKey]
+//        .map { it[SkipSilenceKey] ?: false }
+    // auto scanner
+    val scannerSensitivity by enumPreference(
+        context = context,
+        key = ScannerSensitivityKey,
+        defaultValue = ScannerMatchCriteria.LEVEL_2
+    )
+    val scannerImpl by enumPreference(
+        context = context,
+        key = ScannerImplKey,
+        defaultValue = ScannerImpl.TAGLIB
+    )
+    val scanPaths = context.dataStore.get(ScanPathsKey, defaultValue = "")
+    val excludedScanPaths = context.dataStore.get(ExcludedScanPathsKey, defaultValue = "")
+    val strictExtensions = context.dataStore.get(ScannerStrictExtKey, defaultValue = false)
+    val strictFilePaths = context.dataStore.get(ScannerStrictFilePathsKey, defaultValue = false)
+    val lookupYtmArtists = context.dataStore.get(LookupYtmArtistsKey, defaultValue = false)
+    val autoScan = context.dataStore.get(AutomaticScannerKey, defaultValue = true)
+    val lastLocalScan = context.dataStore.get(LastLocalScanKey, 0L)
+
+    // updater
+    val updateAvailable = context.dataStore.get(
+        UpdateAvailableKey,
+        defaultValue = false
+    )
+    val lastVer = context.dataStore.get(LastVersionKey, defaultValue = "0.0.0")
+
+    if (!autoScan || oobeStatus < OOBE_VERSION) {
+        Log.i(MAIN_TAG, "Automatic scan is disabled, and/or user has not passed OOBE")
+        // media3 starts with downloads paused and only the download service resumes them, and this
+        // is the only thing that starts it at launch. Without it, downloads cut short last time
+        // waited until the next one was started by hand.
+        downloadUtil.resumeDownloadsOnStart()
+        return
+    }
+    val timeNow = LocalDateTime.now().toInstant(ZoneOffset.UTC).toEpochMilli()
+    if (lastLocalScan + AUTO_SCAN_COOLDOWN > timeNow) {
+        Log.i(MAIN_TAG, "Aborting automatic scan. Not enough time has passed since the last scan")
+        downloadUtil.resumeDownloadsOnStart()
+        return
+    }
+    Log.i(MAIN_TAG, "Starting local media and downloads auto scan")
+    context.dataStore.edit { settings ->
+        settings[LastLocalScanKey] =
+            timeNow - AUTO_SCAN_COOLDOWN + AUTO_SCAN_SOFT_COOLDOWN // min cooldown to avoid crash loops
+    }
+    // Only the local media scan is worth announcing. The downloads pass below runs on every auto
+    // scan, including installs with local media turned off, and has to stay quiet there. Otherwise
+    // someone who only uses downloads is told "Refreshing local media" for work that never touches
+    // local media, which is exactly how this read as a bug.
+    val perms = context.checkSelfPermission(MEDIA_PERMISSION_LEVEL)
+    val willScanLocalMedia = localLibEnable &&
+            scannerState.value <= 0 &&
+            perms == PackageManager.PERMISSION_GRANTED
+
+    if (willScanLocalMedia) {
+        coroutineScope.launch {
+            snackbarHostState.showSnackbar(
+                message = context.getString(R.string.scanner_auto_start),
+                withDismissAction = true,
+                duration = SnackbarDuration.Short
+            )
+        }
+    }
+
+    // scan download folders. Runs whenever the automatic scanner is on, whatever localLibEnable is,
+    // because downloaded songs still need their paths re-resolved.
+    downloadUtil.scanDownloads()
+    downloadUtil.resumeDownloadsOnStart()
+    if (!localLibEnable) {
+        context.dataStore.edit { settings ->
+            settings[LastLocalScanKey] = timeNow
+        }
+        playerConnection?.service?.initQueue()
+        Log.i(MAIN_TAG, "Downloads scan completed. Local media is disabled.")
+        // Without this the routine fell through to the completion snackbar below, so a
+        // downloads-only user got told about local media twice.
+        return
+    }
+
+
+    // local media scan
+    // A scan that fails says so, and only that: the end used to be announced after it all the same,
+    // "Scanner failed" and then "refresh complete!".
+    var scanFailed = false
+    // Check if the permissions for local media access
+    if (scannerState.value <= 0 && localLibEnable) {
+        if (perms == PackageManager.PERMISSION_GRANTED) {
+            // equivalent to (quick scan)
+            try {
+                withContext(Dispatchers.Main) {
+                    playerConnection?.player?.pause()
+                }
+                val scanner = LocalMediaScanner.getScanner(
+                    context, scannerImpl, SCANNER_OWNER_LM
+                )
+                if (scannerImpl == ScannerImpl.MEDIASTORE) {
+                    // As the Settings page's quick scan does: MediaStore has a sync of its own, and the
+                    // tag readers' quick sync refuses it, so a launch added no new songs (B4, 29 Oct 2026).
+                    scanner.fullMediaStoreSync(
+                        database, uriListFromString(scanPaths), uriListFromString(excludedScanPaths),
+                        scannerSensitivity, strictExtensions, strictFilePaths, false,
+                    )
+                } else {
+                    val uris = scanner.scanLocal(scanPaths, excludedScanPaths)
+                    scanner.quickSync(database, uris, scannerSensitivity, strictExtensions, strictFilePaths)
+                }
+
+                // start artist linking job
+                if (lookupYtmArtists && scannerState.value <= 0) {
+                    CoroutineScope(lmScannerCoroutine).launch {
+                        try {
+                            scanner.localToRemoteArtist(database)
+                        } catch (e: ScannerAbortException) {
+                            // The scan itself finished: what stopped is the linking after it, as the
+                            // settings say it. This said "Scanner failed", after "refresh complete!".
+                            coroutineScope.launch {
+                                snackbarHostState.showSnackbar(
+                                    message = "${context.getString(R.string.scanner_ytm_link_fail)}: ${e.message}",
+                                    withDismissAction = true,
+                                    duration = SnackbarDuration.Long
+                                )
+                            }
+                        }
+                    }
+                }
+            } catch (e: Exception) {
+                scanFailed = true
+                coroutineScope.launch {
+                    snackbarHostState.showSnackbar(
+                        message = listOfNotNull(context.getString(R.string.scanner_scan_fail), e.message).joinToString(": "),
+                        withDismissAction = true,
+                        duration = SnackbarDuration.Short
+                    )
+                }
+                reportException(e)
+            } finally {
+                clearDtCache()
+                destroyScanner(SCANNER_OWNER_LM)
+            }
+
+            // post scan actions
+            context.dataStore.edit { settings ->
+                settings[LastLocalScanKey] = timeNow
+            }
+            playerConnection?.service?.initQueue()
+            Log.i(MAIN_TAG, "Local media and downloads scan completed")
+        } else if (perms == PackageManager.PERMISSION_DENIED) {
+            // Asked once, at the first automatic scan that finds it missing. Asked at every
+            // automatic scan, which runs at launch at most once every two hours (the soft cooldown
+            // set above), it put a system dialog in front of everyone who listens only to YouTube
+            // and left local media on, which is the default. The Library banner still asks when tapped.
+            // With the short setup it is not asked from here at all, but where somebody has gone
+            // that needs it: see MediaPermissionAsk.
+            if (MediaPermissionAsk.atStart(askedBefore = context.dataStore.get(LocalMediaPermissionAskedKey, defaultValue = false))) {
+                context.dataStore.edit { settings -> settings[LocalMediaPermissionAskedKey] = true }
+                (context as MainActivity).permissionLauncher.launch(MEDIA_PERMISSION_LEVEL)
+            }
+            Log.w(MAIN_TAG, "Not enough permission to perform local media scan")
+        }
+    } else if (localLibEnable) {
+        Log.w(MAIN_TAG, "Cannot perform local media scan, scanner is in use")
+    }
+
+    Log.i(MAIN_TAG, "Local media and downloads auto scan complete")
+    if (willScanLocalMedia && !scanFailed) {
+        coroutineScope.launch {
+            snackbarHostState.showSnackbar(
+                message = context.getString(R.string.scanner_auto_end),
+                withDismissAction = true,
+                duration = SnackbarDuration.Short
+            )
+        }
+    }
+
+}

@@ -1,0 +1,50 @@
+# InterTune 0.10.8
+
+A small release: three new things, the Quick picks row behaving itself, and the interface work that was ready. Nothing here changes unless you use it.
+
+## Backups
+
+- **Automatic backups.** Under Settings > Storage > Backup and restore, choose a folder and InterTune backs up your library, playlists, settings and listening history there every day or every week, keeping as many as you say: a slider from one to twenty, with a line above it that follows your finger. Off until you turn it on. There is a Back up now button beside it, and a line saying when the last one ran.
+- **Export playlists as M3U.** Every playlist in your library as a file you can open anywhere, one tap, into a folder you choose. The same format the per-playlist export already wrote.
+
+## Playing
+
+- **Save the queue as a playlist.** A button on the queue sheet turns whatever you are listening to into a playlist, songs in the order shown, named by you. Radio songs that were never in your library are added to it as part of the save.
+- Skip silence was already there, under Player and audio, and stays there.
+- **Music no longer sticks on "Wait to reconnect".** One failed request, on a connection that never went down, could hold a song for good: the app sat waiting for a network to come back that had never gone away, and only a force close cleared it. It now tries again on a timer and then decides, rather than waiting for something that is not coming. The play button was also drawing a pause icon over a stopped player, so the one tap that would have fixed it looked like the tap that would stop the music.
+- **A back button on the mini player.** It had play and next and nothing to go back with, so hearing something again meant opening the full player or reaching for the headset.
+- **Skipping is lighter.** Every song change used to ask the settings file four questions, three of them on the thread that draws the screen, which is what made spamming next or previous feel heavy.
+- **Let other apps play at the same time** now takes effect when you turn it on, mid song. It used to be read once when the app's player was built and never again, and since that player outlives pausing, backgrounding and even swiping the app away, the switch did nothing at all until the process was killed. That is why it seemed to work sometimes and not others.
+
+## Quick picks
+
+- The row no longer blanks on every refresh, and Home no longer shows two rows both called Quick picks.
+- On the YouTube Music source the row is YouTube's own Quick picks shelf. A feed that also carries a shelf of hour-long mixes no longer puts those under the heading.
+- A card you play from Quick picks stays where it is, playing, until you refresh. The row never changes while you are away in the player.
+- Pull to refresh brings new songs to Quick picks, Forgotten favourites and Keep listening, not the same ones in a new order.
+- Two long-standing defects in the library Quick picks query were fixed: it counted the same seed twice, and Forgotten favourites could surface songs still being played.
+- Versions of one song (live, slowed, remastered, official video) are recognised and never shown side by side.
+- The row arrives about four seconds sooner. It used to wait behind nine requests filling the "Similar to" rows further down the screen, which nothing about Quick picks needs; those now load alongside it instead of in front of it.
+
+## Interface
+
+- Predictive back and reveal transitions (switch, on).
+- An Offline tab: the songs that will play with no connection.
+- Remove a song from its playlist without leaving the player.
+- Resume playback when the app opens, as a setting.
+- Audio quality has a Highest available tier, and the settings show what is actually playing: codec, bitrate and sample rate.
+- The app says so when the song cache is turned off.
+- Songs no longer arrive with a play count or an upload date where the artist should be. YouTube leaves that slot empty on some rows, and the app took whatever was sitting there, which is how a library ends up with an artist called "431K plays" or "Aug 25, 2016". Names already saved that way are not repaired yet.
+- The store listing and its screen shots were redone.
+
+## Updates
+
+- Installs from F-Droid update through F-Droid; the in-app updater steps aside for them.
+- If InterTune reaches F-Droid, its copy will be signed with F-Droid's key rather than mine, so neither copy can install over the other. Moving either way means uninstalling first, which loses your library unless you back it up. That is what the automatic backups are for.
+
+## The listening log
+
+- InterTune starts keeping a log of what you play: every stop, how far through you got, how it ended and where you started it from. It is on this device, in the app's own database, and it goes nowhere else. It is what the recommendation work coming next will learn from, and starting it now means that work arrives to a history rather than to nothing.
+- Two things already read it, and they are the two Quick picks improvements above: the row skips what you have just heard, and it is ordered by what you tend to finish, search for and like rather than by the order it arrived in. Both are on, and this release has no switch for either; that comes later.
+- **Settings > Privacy and history > Pause listen history** turns the log off, and **Clear listen history** deletes all of it. Both were already there and both cover the new log. With it paused, the two behaviours above have nothing to work from and the row is simply the order it arrived in.
+- It rides along in a backup, so a backup taken now carries it.

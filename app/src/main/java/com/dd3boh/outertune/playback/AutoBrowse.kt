@@ -1,0 +1,111 @@
+/*
+ * Copyright (C) 2026 InterTune
+ *
+ * SPDX-License-Identifier: GPL-3.0
+ */
+
+package com.dd3boh.outertune.playback
+
+import android.content.Context
+import android.net.Uri
+
+/**
+ * What Android Auto is shown since the rework (Unreleased.AUTO_REWORK), by the ids it is handed.
+ *
+ * A car's screen is for somebody who is driving: a few large things to tap, each of which plays
+ * at once, and nothing to read down. So the first tab is "For you", rows of covers: the liked
+ * songs and the downloads in a new order, then Home's own Quick picks, Keep listening and
+ * Forgotten favourites. Playlists are a tab of covers, each opening on a row that shuffles it.
+ * The library opens on what was played lately, then albums and artists as covers and its songs
+ * newest first and no more than a couple of hundred. Across the top of every tab is what is
+ * playing, a row to tap to get back to the player.
+ *
+ * The ids: "home/<section>/<song>" for a song of a row of For you, "recent/<song>",
+ * "shuffle/liked", "shuffle/downloaded" and "shuffle/playlist/<playlist>" for a list in a new
+ * order, "resume/queue" for the queue there is. PlayRequest reads them back.
+ */
+object AutoBrowse {
+    const val HOME = "home"
+    const val LIBRARY = "library"
+    const val RECENT = "recent"
+    const val SHUFFLE = "shuffle"
+    const val RESUME = "resume"
+
+    /**
+     * The tabs, left to right. Each has what is playing across its top, and the car is told when
+     * that changes: it keeps the tabs it was handed and asks for none of them again by itself.
+     * Told, it draws the tab in front again from its top, which is the price of the row being
+     * right. Three and not four: the car adds a tab of its own, "More", for the settings, and
+     * with four of ours the last one went in there with them.
+     */
+    val TABS = listOf(HOME, MusicService.PLAYLIST, LIBRARY)
+
+    const val QUICK = "quick"
+    const val KEEP = "keep"
+    const val FORGOTTEN = "forgotten"
+    val SECTIONS = listOf(QUICK, KEEP, FORGOTTEN)
+
+    const val LIKED = "liked"
+    const val DOWNLOADED = "downloaded"
+    const val PLAYLIST_PREFIX = "playlist/"
+
+    /** The songs one row of Home brings: what plays on after the one that was tapped. */
+    const val MOST = 12
+
+    /** How many of them are shown: two rows of the car's large tiles, taken in at a glance. */
+    const val SHOWN = 6
+
+    /** How one thing in a list of the car's is laid out: under which heading, and as a tile or as a row. */
+    data class Laid(val heading: String?, val tile: Boolean)
+
+    /**
+     * A list cut into the sections of a screen: each run of neighbours under one heading and laid
+     * out one way. A heading is said once, so of a row and the tiles after it under the same
+     * heading only the row's section carries it.
+     */
+    fun <T> sections(items: List<T>, laid: (T) -> Laid): List<Pair<Laid, List<T>>> {
+        val out = ArrayList<Pair<Laid, MutableList<T>>>()
+        var before: Laid? = null
+        for (item in items) {
+            val how = laid(item)
+            if (before == how) out.last().second += item
+            else out += Laid(how.heading.takeIf { it != before?.heading || before == null }, how.tile) to mutableListOf(item)
+            before = how
+        }
+        return out
+    }
+
+    /** The songs of the library's own list and of Recent: more than that is not read at the wheel. */
+    const val MOST_SONGS = 200
+    const val MOST_RECENT = 30
+
+    /**
+     * The songs of Quick picks, by id: the ones Home showed last come first, because Home knows
+     * which source the listener chose for that row, then the library's own, none of them twice.
+     */
+    fun picks(shown: List<String>, library: List<String>, most: Int = MOST): List<String> =
+        (shown + library).distinct().take(most)
+}
+
+/**
+ * A cover for the car. Android Auto does not load a picture from a web address: it wants one of
+ * the app's own, a content address, which AutoArtProvider answers by fetching the cover once and
+ * keeping it. The address names a song, an album, an artist or a playlist by its id and nothing
+ * else, so that the provider can only ever be asked for a cover of something in the library.
+ */
+object AutoArt {
+    const val SONG = "song"
+    const val ALBUM = "album"
+    const val ARTIST = "artist"
+    const val PLAYLIST = "playlist"
+    private val KINDS = setOf(SONG, ALBUM, ARTIST, PLAYLIST)
+
+    fun authority(context: Context): String = "${context.packageName}.autoart"
+
+    fun uri(context: Context, kind: String, id: String): Uri =
+        Uri.Builder().scheme("content").authority(authority(context)).appendPath(kind).appendPath(id).build()
+
+    /** The kind and the id an address names, or null for anything that is not one of ours. */
+    fun parse(segments: List<String>): Pair<String, String>? =
+        if (segments.size == 2 && segments[0] in KINDS && segments[1].isNotEmpty()) segments[0] to segments[1] else null
+}

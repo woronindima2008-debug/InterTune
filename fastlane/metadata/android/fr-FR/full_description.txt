@@ -1,0 +1,42 @@
+<p><i>InterTune</i> est un fork d'<a href="https://github.com/OuterTune/OuterTune">OuterTune</a>, lui-même dérivé d'<a href="https://github.com/z-huang/InnerTune">InnerTune</a>. C'est à la fois un lecteur multimédia local et un client YouTube Music.</p>
+<p>
+<b>Fonctionnalités :</b></p>
+<ul>
+<li>Client YouTube Music avec téléchargement de morceaux pour lecture hors ligne, lecture en arrière-plan, absence de publicités et synchronisation du compte</li>
+<li>Lecture de fichiers audio locaux (MP3, OGG, FLAC, etc.)</li>
+<li>Extracteur de balises personnalisé (au lieu de MediaStore) pour un affichage correct des balises séparées par une barre oblique inverse</li>
+<li>Lecture de fichiers locaux et de titres YouTube Music dans la même file d'attente</li>
+<li>Diffusion sur Chromecast, récepteur FCast ou téléviseur DLNA</li>
+<li>Onglet Hors ligne listant les morceaux déjà mis en cache pour une consultation sans connexion</li>
+<li>Un écran de bibliothèque unifié</li>
+<li>Files d'attente multiples</li>
+<li>Paroles synchronisées, y compris mot à mot et style karaoké (LRC, TTML)</li>
+<li>Ligne en caractères latins sous les écritures japonaises (romaji, kanji conservés), coréennes, chinoises, russes et autres (à partir d'Android 10)</li>
+<li>Égaliseur à dix bandes : profils prédéfinis ou mesures adaptées à votre casque (AutoEq)</li>
+<li>Normalisation audio, réglage du tempo et de la tonalité, ainsi que d'autres effets audio</li>
+<li>Choix de la source de la Sélection Rapide : YouTube Music, Votre bibliothèque ou Meilleures recommandations (générées sur l'appareil selon vos écoutes)</li>
+<li>« Quel est ce titre ? » identifie la musique environnante via Shazam et peut créer une playlist avec les titres détectés</li>
+<li>Widget d'écran d'accueil s'adaptant à sa taille</li>
+<li>Audio spatial sur tout casque, avec suivi des mouvements de tête sur les modèles compatibles</li>
+<li>Compatibilité Android Auto</li>
+</ul>
+<p>
+<b>Connexions et services :</b></p>
+<ul>
+<li>YouTube Music, pour les recherches, lectures, téléchargements et synchronisations (connexion facultative).</li>
+<li>LRCLIB et KuGou, pour récupérer les paroles des morceaux en cours de lecture (désactivables individuellement).</li>
+<li>Mesures AutoEq sur GitHub, uniquement lors de la recherche de votre casque dans l'égaliseur.</li>
+<li>Shazam, uniquement pendant l'écoute. Seule une empreinte audio, l'heure et le fuseau horaire sont transmis (jamais l'enregistrement). La pochette est chargée depuis l'adresse fournie par Shazam.</li>
+<li>Last.fm, uniquement en cas d'activation. Pour trouver des titres similaires, le titre et l'artiste des morceaux lus sont transmis, ainsi qu'une fois ceux des morceaux aimés ou écoutés le mois dernier, sans compte requis. Si vous connectez un compte Last.fm, les écoutes y sont également enregistrées (album, durée et heure de début) via la page d'authentification officielle de Last.fm.</li>
+<li>GitHub, uniquement si la vérification des mises à jour est activée ou demandée manuellement. L'application peut télécharger une nouvelle version et la transmettre à l'installateur Android (qui demande toujours confirmation). Les installations provenant d'F-Droid utilisent le système de mise à jour d'F-Droid.</li>
+<li>Sondages et annonces, uniquement en cas d'activation. Ils sont chargés depuis un Gist GitHub et les images associées proviennent de l'adresse indiquée. L'ouverture ou la réponse est comptabilisée sur Umami Cloud, sans compte ni identifiant d'appareil.</li>
+<li>Statistiques d'utilisation, uniquement en cas d'activation. Au maximum une fois par jour, l'application transmet à Umami Cloud un nom aléatoire renouvelé chaque mois, l'origine de l'installation (F-Droid ou non) ainsi que les versions de l'application et d'Android.</li>
+</ul>
+<p>
+<b>Remarques :</b></p>
+<ul>
+<li>Android 7.0 ou version ultérieure requis.</li>
+<li>Un problème ? Veuillez le signaler depuis l'application (Paramètres, À propos, Envoyer un rapport de bogue) ou sur <a href="https://github.com/ItzSkyeYT/InterTune/issues">GitHub</a>.</li>
+</ul>
+<p>
+InterTune n'est ni affilié, ni sponsorisé, ni approuvé par Google ou YouTube.</p>

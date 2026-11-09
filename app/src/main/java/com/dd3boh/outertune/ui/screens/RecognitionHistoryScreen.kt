@@ -1,0 +1,191 @@
+/*
+ * Copyright (C) 2026 InterTune
+ *
+ * SPDX-License-Identifier: GPL-3.0
+ */
+
+package com.dd3boh.outertune.ui.screens
+
+import com.dd3boh.outertune.ui.utils.dpadFocusIndicator
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.asPaddingValues
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
+import androidx.compose.material3.TopAppBarScrollBehavior
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.dp
+import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.navigation.NavController
+import com.dd3boh.outertune.constants.PlayOrigin
+import com.dd3boh.outertune.LocalDatabase
+import com.dd3boh.outertune.LocalPlayerAwareWindowInsets
+import com.dd3boh.outertune.LocalPlayerConnection
+import com.dd3boh.outertune.R
+import com.dd3boh.outertune.constants.Unreleased
+import com.dd3boh.outertune.models.toMediaMetadata
+import com.dd3boh.outertune.playback.queues.YouTubeQueue
+import com.dd3boh.outertune.recognition.Heard
+import com.dd3boh.outertune.recognition.KeptListen
+import com.dd3boh.outertune.recognition.RecognitionViewModel
+import com.dd3boh.outertune.ui.component.FloatingTopBar
+import com.dd3boh.outertune.utils.urlEncode
+import com.zionhuang.innertube.models.WatchEndpoint
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.launch
+import java.text.DateFormat
+import java.util.Date
+
+/**
+ * Every song the app has heard in a room.
+ *
+ * Kept deliberately plain. This is a log, not a library: no artwork, no menus, no selection. The
+ * one action that makes sense is playing something again, and only the entries that were placed on
+ * YouTube can do that, so the rest are shown without pretending to be tappable.
+ *
+ * Above the songs, what was heard with no connection and waits to be named (RecogniseLater), newest
+ * first, each by when it was heard. Nothing to tap there yet: the song takes its place in the list
+ * once it is named.
+ */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun RecognitionHistoryScreen(
+    navController: NavController,
+    scrollBehavior: TopAppBarScrollBehavior,
+    viewModel: RecognitionViewModel = hiltViewModel(),
+) {
+    val heard by viewModel.heard.collectAsStateWithLifecycle(initialValue = emptyList())
+    val kept by viewModel.waiting.collectAsStateWithLifecycle(initialValue = emptyList())
+    val waiting = if (Unreleased.RECOGNISE_OFFLINE) kept.asReversed() else emptyList()
+    val playerConnection = LocalPlayerConnection.current
+    val database = LocalDatabase.current
+    val scope = rememberCoroutineScope()
+
+    if (heard.isEmpty() && waiting.isEmpty()) {
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(32.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+        ) {
+            Text(
+                text = stringResource(R.string.recognition_history_empty),
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                textAlign = TextAlign.Center,
+                modifier = Modifier.padding(top = 120.dp),
+            )
+        }
+    } else {
+        LazyColumn(
+            modifier = Modifier.fillMaxSize(),
+            contentPadding = LocalPlayerAwareWindowInsets.current.asPaddingValues(),
+        ) {
+            items(waiting, key = { "waiting/${it.heardAt}" }) { listen ->
+                WaitingRow(listen)
+            }
+            items(heard, key = { it.at }) { entry ->
+                HeardRow(
+                    entry = entry,
+                    // Placed on YouTube at the time: play it. Named but never placed, which is a
+                    // real and common outcome: search for it, so the row is worth tapping either
+                    // way rather than being a name with nothing behind it.
+                    onOpen = {
+                        scope.launch {
+                            // Handed the song when the library holds it, so it loads at once
+                            // and the rest joins it. The entry itself cannot stand in: it
+                            // keeps what Shazam called the song, not its title on YouTube, its
+                            // artists or its cover, and the player would show it that way and
+                            // the library keep it that way. Unknown, it waits for the answer.
+                            // The same row says whether an entry saved before its video was
+                            // checked is the song at all: see Heard.idToPlay.
+                            val known = entry.videoId
+                                ?.let { id -> database.song(id).first()?.toMediaMetadata() }
+                            val id = entry.idToPlay(known)
+                            if (id != null) {
+                                playerConnection?.playQueue(
+                                    YouTubeQueue(WatchEndpoint(videoId = id), known),
+                                    origin = PlayOrigin.RECOGNISED,
+                                )
+                            } else {
+                                val query = listOf(entry.title, entry.artist)
+                                    .filter { it.isNotBlank() }.joinToString(" ")
+                                if (query.isNotBlank()) {
+                                    navController.navigate("search/${query.urlEncode()}")
+                                }
+                            }
+                        }
+                    },
+                )
+            }
+        }
+    }
+
+    FloatingTopBar(title = stringResource(R.string.recognition_history), navController = navController)
+}
+
+@Composable
+private fun HeardRow(entry: Heard, onOpen: () -> Unit) {
+    val when_ = remember(entry.at) {
+        DateFormat.getDateTimeInstance(DateFormat.MEDIUM, DateFormat.SHORT).format(Date(entry.at))
+    }
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .dpadFocusIndicator()
+            .clickable(onClick = onOpen)
+            .padding(horizontal = 16.dp, vertical = 12.dp)
+    ) {
+        Text(
+            text = entry.title,
+            style = MaterialTheme.typography.bodyLarge,
+            maxLines = 1,
+        )
+        Text(
+            text = if (entry.artist.isBlank()) when_ else "${entry.artist} · $when_",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            maxLines = 1,
+        )
+    }
+}
+
+/** A listen kept with no connection: when it was heard, and that it waits to be named. */
+@Composable
+private fun WaitingRow(listen: KeptListen) {
+    val when_ = remember(listen.heardAt) {
+        DateFormat.getDateTimeInstance(DateFormat.MEDIUM, DateFormat.SHORT).format(Date(listen.heardAt))
+    }
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp, vertical = 12.dp)
+    ) {
+        Text(
+            text = stringResource(R.string.recognise_later_waiting),
+            style = MaterialTheme.typography.bodyLarge,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            maxLines = 1,
+        )
+        Text(
+            text = when_,
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            maxLines = 1,
+        )
+    }
+}

@@ -1,0 +1,63 @@
+name: Feature request
+description: Suggest something new for InterTune
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Ideas are welcome, and reasonable ones that make the app better get built. Before you write one up, check the [Roadmap](https://github.com/ItzSkyeYT/InterTune#roadmap): it lists what is already planned or being built.
+
+  - type: textarea
+    id: what
+    attributes:
+      label: What you want
+      description: Describe the finished thing rather than how to build it. Where it lives in the app, what it looks like, what happens when you tap it.
+      placeholder: |
+        Long-pressing a song in the queue opens the same menu the library rows have, with Play next
+        and Add to playlist.
+    validations:
+      required: true
+
+  - type: textarea
+    id: why
+    attributes:
+      label: What you are trying to do
+      description: The problem underneath the request. There is often a smaller change that solves the same problem, and it is much easier to find when the problem is written down too.
+      placeholder: |
+        I build queues by hand while walking, and right now I have to leave the player, find the
+        song again in the library, then come back.
+    validations:
+      required: true
+
+  - type: dropdown
+    id: upstream-parity
+    attributes:
+      label: Does OuterTune already do this?
+      description: |
+        InterTune started from OuterTune 0.10.1 and does not follow its newer releases. If a
+        [newer OuterTune release](https://github.com/OuterTune/OuterTune/releases) already has it,
+        a link in the last box helps a lot, since porting a known change is far easier. And if
+        0.10.1 does it and InterTune does not, that is something I broke, and I want to know.
+      options:
+        - "No, or not that I know of"
+        - "Yes, a newer OuterTune release has it"
+        - "Yes, OuterTune 0.10.1 has it and InterTune does not"
+        - "Not sure"
+    validations:
+      required: true
+
+  - type: textarea
+    id: references
+    attributes:
+      label: Mockups, screenshots or links
+      description: Optional, and worth more than another paragraph. A shot of another app doing it, a rough sketch, or a link to the upstream change that implemented it. Drag files straight into this box.
+
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Before you submit
+      options:
+        - label: I have read the [Roadmap](https://github.com/ItzSkyeYT/InterTune#roadmap) of planned features, and this is not on it
+          required: true
+        - label: I looked through the [existing issues](https://github.com/ItzSkyeYT/InterTune/issues?q=is%3Aissue) and this has not been asked for
+          required: true

@@ -1,0 +1,155 @@
+/*
+ * Copyright (C) 2026 InterTune
+ *
+ * SPDX-License-Identifier: GPL-3.0
+ */
+
+package com.dd3boh.outertune.ui.screens.settings
+
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.GraphicEq
+import androidx.compose.material.icons.rounded.Headphones
+import androidx.compose.material.icons.rounded.Timer
+import androidx.compose.material.icons.rounded.History
+import androidx.compose.material3.ElevatedCard
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.Icon
+import androidx.compose.material3.Text
+import androidx.compose.material3.TopAppBarScrollBehavior
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.unit.dp
+import androidx.navigation.NavController
+import com.dd3boh.outertune.R
+import com.dd3boh.outertune.constants.RecogniseAutoAddKey
+import com.dd3boh.outertune.constants.RecogniseKeepAwakeKey
+import com.dd3boh.outertune.constants.RecogniseListenSecondsKey
+import com.dd3boh.outertune.constants.RecogniseKeepListeningKey
+import com.dd3boh.outertune.constants.RecognisePauseOnSpeakerKey
+import androidx.hilt.navigation.compose.hiltViewModel
+import com.dd3boh.outertune.recognition.MicrophoneListener
+import com.dd3boh.outertune.recognition.RecognitionViewModel
+import com.dd3boh.outertune.ui.dialog.AskFirstDialog
+import com.dd3boh.outertune.ui.component.ColumnWithContentPadding
+import com.dd3boh.outertune.ui.component.ExplainedPreference
+import com.dd3boh.outertune.ui.component.ExplainedSwitchPreference
+import com.dd3boh.outertune.ui.component.FloatingTopBar
+import com.dd3boh.outertune.ui.component.ListPreference
+import com.dd3boh.outertune.ui.component.PreferenceGroupTitle
+import com.dd3boh.outertune.ui.component.SwitchPreference
+import com.dd3boh.outertune.utils.rememberPreference
+import com.dd3boh.outertune.ui.screens.walkthrough.Tour
+import com.dd3boh.outertune.ui.screens.walkthrough.tourTarget
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun RecognitionSettings(
+    navController: NavController,
+    scrollBehavior: TopAppBarScrollBehavior,
+    viewModel: RecognitionViewModel = hiltViewModel(),
+) {
+    val (keepListening, onKeepListeningChange) =
+        rememberPreference(RecogniseKeepListeningKey, defaultValue = false)
+    val (pauseOnSpeaker, onPauseOnSpeakerChange) =
+        rememberPreference(RecognisePauseOnSpeakerKey, defaultValue = true)
+    val (autoAdd, onAutoAddChange) =
+        rememberPreference(RecogniseAutoAddKey, defaultValue = true)
+    val (keepAwake, onKeepAwakeChange) =
+        rememberPreference(RecogniseKeepAwakeKey, defaultValue = false)
+    val (listenSeconds, onListenSecondsChange) =
+        rememberPreference(RecogniseListenSecondsKey, defaultValue = MicrophoneListener.DEFAULT_SECONDS)
+
+    ColumnWithContentPadding(
+        modifier = Modifier.fillMaxHeight(),
+        columnModifier = Modifier.padding(horizontal = 16.dp),
+    ) {
+        PreferenceGroupTitle(title = stringResource(R.string.recognise_settings))
+
+        ElevatedCard(modifier = Modifier.fillMaxWidth()) {
+            ExplainedSwitchPreference(
+                modifier = Modifier.tourTarget(Tour.SETTING_RECOGNISE_KEEP_LISTENING).settingRow(R.string.recognise_keep_listening),
+                title = stringResource(R.string.recognise_keep_listening),
+                explanation = stringResource(R.string.recognise_keep_listening_explain),
+                description = stringResource(R.string.recognise_keep_listening_desc),
+                checked = keepListening,
+                onCheckedChange = onKeepListeningChange,
+            )
+            SwitchPreference(
+                modifier = Modifier.tourTarget(Tour.SETTING_RECOGNISE_PAUSE).settingRow(R.string.recognise_pause_title),
+                title = { Text(stringResource(R.string.recognise_pause_title)) },
+                description = stringResource(R.string.recognise_pause_desc),
+                checked = pauseOnSpeaker,
+                onCheckedChange = onPauseOnSpeakerChange,
+            )
+            ExplainedSwitchPreference(
+                modifier = Modifier.tourTarget(Tour.SETTING_RECOGNISE_AUTO_ADD).settingRow(R.string.recognise_auto_add),
+                title = stringResource(R.string.recognise_auto_add),
+                explanation = stringResource(R.string.recognise_auto_add_explain),
+                description = stringResource(R.string.recognise_auto_add_desc),
+                checked = autoAdd,
+                onCheckedChange = onAutoAddChange,
+            )
+            SwitchPreference(
+                modifier = Modifier.settingRow(R.string.recognise_keep_awake),
+                title = { Text(stringResource(R.string.recognise_keep_awake)) },
+                description = stringResource(R.string.recognise_keep_awake_desc),
+                checked = keepAwake,
+                onCheckedChange = onKeepAwakeChange,
+            )
+        }
+
+        Spacer(Modifier.height(16.dp))
+
+        ElevatedCard(modifier = Modifier.fillMaxWidth()) {
+            ListPreference(
+                modifier = Modifier.tourTarget(Tour.SETTING_RECOGNISE_SECONDS).settingRow(R.string.recognise_listen_seconds),
+                title = { Text(stringResource(R.string.recognise_listen_seconds)) },
+                icon = { Icon(Icons.Rounded.Timer, null) },
+                selectedValue = listenSeconds,
+                values = listOf(8, 12, 16, 20),
+                valueText = { stringResource(R.string.recognise_seconds, it) },
+                onValueSelected = onListenSecondsChange,
+            )
+        }
+
+        Spacer(Modifier.height(16.dp))
+
+        // Up to 200 songs go at once and none comes back, so the tap is asked about first.
+        var askClear by rememberSaveable { mutableStateOf(false) }
+        ElevatedCard(modifier = Modifier.fillMaxWidth()) {
+            ExplainedPreference(
+                modifier = Modifier.settingRow(R.string.recognise_clear_history),
+                title = stringResource(R.string.recognise_clear_history),
+                explanation = stringResource(R.string.recognise_clear_history_explain),
+                description = stringResource(R.string.recognise_clear_history_desc),
+                onClick = { askClear = true },
+            )
+        }
+        if (askClear) {
+            AskFirstDialog(
+                title = stringResource(R.string.recognise_clear_ask_title),
+                text = stringResource(R.string.recognise_clear_ask_text),
+                confirm = stringResource(R.string.recognise_clear_history),
+                onConfirm = {
+                    askClear = false
+                    // Both: reset empties this run, clearHistory empties what is remembered across
+                    // runs. The entry says history, so it has to be the second one too.
+                    viewModel.reset(); viewModel.clearRecognised(); viewModel.clearHistory()
+                },
+                onDismiss = { askClear = false },
+            )
+        }
+    }
+
+    FloatingTopBar(title = stringResource(R.string.recognise_settings), navController = navController)
+}

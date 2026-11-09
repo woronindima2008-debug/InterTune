@@ -1,0 +1,736 @@
+/*
+ * Copyright (C) 2024 z-huang/InnerTune
+ * Copyright (C) 2025 O⁠ute⁠rTu⁠ne Project
+ *
+ * SPDX-License-Identifier: GPL-3.0
+ *
+ * For any other attributions, refer to the git commit history
+ */
+
+package com.dd3boh.outertune.ui.dialog
+
+import com.dd3boh.outertune.ui.utils.dpadFocusIndicator
+import android.content.ClipData
+import android.text.format.Formatter
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ColumnScope
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.RowScope
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.imePadding
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.sizeIn
+import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyListScope
+import androidx.compose.foundation.lazy.LazyListState
+import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.Error
+import androidx.compose.material.icons.outlined.Info
+import androidx.compose.material.icons.rounded.Info
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.AlertDialogDefaults
+import androidx.compose.material3.BasicAlertDialog
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.Icon
+import androidx.compose.material3.LocalContentColor
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextFieldDefaults
+import androidx.compose.material3.ProvideTextStyle
+import androidx.compose.material3.Slider
+import androidx.compose.material3.SnackbarDuration
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.material3.TextField
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.platform.Clipboard
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.input.TextFieldValue
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
+import com.dd3boh.outertune.LocalSnackbarHostState
+import com.dd3boh.outertune.R
+import com.dd3boh.outertune.constants.DialogCornerRadius
+import com.dd3boh.outertune.constants.SNACKBAR_VERY_SHORT
+import com.dd3boh.outertune.db.entities.FormatEntity
+import com.dd3boh.outertune.models.MediaMetadata
+import com.dd3boh.outertune.ui.component.ButtonsRow
+import com.dd3boh.outertune.ui.component.button.IconButton
+import com.dd3boh.outertune.ui.utils.DialogAboveKeyboard
+import com.dd3boh.outertune.ui.utils.Landscape
+import com.dd3boh.outertune.ui.utils.LocalLandscape
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
+import java.io.File
+
+/**
+ * A question before something that cannot be taken back: what it does, Cancel, and the action
+ * under its own name. Laid out as the questions of Your data are.
+ */
+@Composable
+fun AskFirstDialog(
+    title: String,
+    text: String,
+    confirm: String,
+    onConfirm: () -> Unit,
+    onDismiss: () -> Unit,
+) {
+    DefaultDialog(
+        onDismiss = onDismiss,
+        horizontalAlignment = Alignment.Start,
+        // Padded to line up with the text below, as ExplainDialog does.
+        title = {
+            Text(title, modifier = Modifier.padding(start = 16.dp, end = 16.dp, top = 16.dp, bottom = 4.dp))
+        },
+        buttons = {
+            TextButton(modifier = Modifier.dpadFocusIndicator(),
+onClick = onDismiss) {
+                Text(stringResource(android.R.string.cancel))
+            }
+            TextButton(modifier = Modifier.dpadFocusIndicator(),
+onClick = onConfirm) {
+                Text(confirm)
+            }
+        },
+    ) {
+        // The words give way to the buttons where the window is short: they scroll.
+        Text(
+            text = text,
+            style = MaterialTheme.typography.bodyMedium,
+            modifier = Modifier
+                .weight(1f, fill = false)
+                .verticalScroll(rememberScrollState())
+                .padding(horizontal = 16.dp),
+        )
+    }
+}
+
+@Composable
+fun DefaultDialog(
+    onDismiss: () -> Unit,
+    modifier: Modifier = Modifier,
+    icon: (@Composable () -> Unit)? = null,
+    title: (@Composable () -> Unit)? = null,
+    buttons: (@Composable () -> Unit)? = null,
+    horizontalAlignment: Alignment.Horizontal = Alignment.CenterHorizontally,
+    /** At the other end of the buttons' row, for what is not an answer: a time picker's switch between the clock and the keyboard. */
+    buttonsStart: (@Composable () -> Unit)? = null,
+    /**
+     * Whether what the dialog says scrolls when it is taller than the room the buttons leave it.
+     *
+     * The scroll belongs here and not on [modifier]: a scroll around the whole dialog measures it
+     * with no height limit, and the part that gives way to the buttons is then given no height at
+     * all. That is how the lyrics search lost its two fields (19 Oct 2026), and a name asked for on
+     * a phone on its side its field and buttons.
+     */
+    scrollable: Boolean = false,
+    content: @Composable ColumnScope.() -> Unit,
+) {
+    Dialog(
+        onDismissRequest = onDismiss,
+        properties = DialogProperties(usePlatformDefaultWidth = false)
+    ) {
+        // On a phone on its side the dialog keeps to what the keyboard leaves of the window.
+        DialogAboveKeyboard()
+        Surface(
+            // usePlatformDefaultWidth is off above, so without a cap these run the full window
+            // width. On a tablet that turns a one-word picker into a slab.
+            modifier = Modifier
+                .then(if (LocalLandscape.current.active) Modifier.imePadding() else Modifier)
+                .padding(24.dp)
+                .sizeIn(minWidth = 280.dp, maxWidth = 560.dp),
+            shape = AlertDialogDefaults.shape,
+            color = AlertDialogDefaults.containerColor,
+            tonalElevation = AlertDialogDefaults.TonalElevation
+        ) {
+            Column(
+                horizontalAlignment = horizontalAlignment,
+                modifier = modifier
+                    .padding(8.dp)
+            ) {
+                if (icon != null) {
+                    CompositionLocalProvider(LocalContentColor provides AlertDialogDefaults.iconContentColor) {
+                        Box(
+                            Modifier.align(Alignment.CenterHorizontally)
+                        ) {
+                            icon()
+                        }
+                    }
+
+                    Spacer(Modifier.height(16.dp))
+                }
+                if (title != null) {
+                    CompositionLocalProvider(LocalContentColor provides AlertDialogDefaults.titleContentColor) {
+                        ProvideTextStyle(MaterialTheme.typography.headlineSmall) {
+                            Box(
+                                // Align the title to the center when an icon is present.
+                                Modifier.align(if (icon == null) Alignment.Start else Alignment.CenterHorizontally)
+                            ) {
+                                title()
+                            }
+                        }
+                    }
+
+                    Spacer(Modifier.height(16.dp))
+                }
+
+                // What the dialog says gives way to its buttons, never the other way round: left to
+                // itself a long text on a short screen (a phone on its side, large text) took the
+                // whole height and the buttons were not drawn at all.
+                Column(
+                    horizontalAlignment = horizontalAlignment,
+                    modifier = Modifier
+                        .weight(1f, fill = false)
+                        .then(if (scrollable) Modifier.verticalScroll(rememberScrollState()) else Modifier),
+                    content = content,
+                )
+
+                if (buttons != null) {
+                    Spacer(Modifier.height(24.dp))
+
+                    ButtonsRow(
+                        modifier = if (buttonsStart != null) Modifier.fillMaxWidth() else Modifier.align(Alignment.End),
+                        start = { buttonsStart?.invoke() },
+                    ) {
+                        CompositionLocalProvider(LocalContentColor provides MaterialTheme.colorScheme.primary) {
+                            ProvideTextStyle(
+                                value = MaterialTheme.typography.labelLarge
+                            ) {
+                                buttons()
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun ListDialog(
+    onDismiss: () -> Unit,
+    modifier: Modifier = Modifier,
+    /** Where the list is: a long list can open on the entry chosen rather than on its first. */
+    state: LazyListState = rememberLazyListState(),
+    content: LazyListScope.() -> Unit,
+) {
+    Dialog(
+        onDismissRequest = onDismiss,
+        properties = DialogProperties(usePlatformDefaultWidth = false)
+    ) {
+        Surface(
+            // usePlatformDefaultWidth is off above, so without a cap these run the full window
+            // width. On a tablet that turns a one-word picker into a slab.
+            modifier = Modifier
+                .padding(24.dp)
+                .sizeIn(minWidth = 280.dp, maxWidth = 560.dp),
+            shape = AlertDialogDefaults.shape,
+            color = AlertDialogDefaults.containerColor,
+            tonalElevation = AlertDialogDefaults.TonalElevation
+        ) {
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                modifier = modifier.padding(vertical = 24.dp)
+            ) {
+                LazyColumn(
+                    state = state,
+                    content = content
+                )
+            }
+        }
+    }
+}
+
+@Composable
+fun TextFieldDialog(
+    modifier: Modifier = Modifier,
+    icon: (@Composable () -> Unit)? = null,
+    title: (@Composable () -> Unit)? = null,
+    initialTextFieldValue: TextFieldValue = TextFieldValue(),
+    placeholder: @Composable (() -> Unit)? = null,
+    singleLine: Boolean = true,
+    maxLines: Int = if (singleLine) 1 else 10,
+    isInputValid: (String) -> Boolean = { it.isNotEmpty() },
+    keyboardType: KeyboardType = KeyboardType.Text,
+    onDone: (String) -> Unit,
+    onDismiss: () -> Unit,
+    extraContent: (@Composable () -> Unit)? = null,
+    /**
+     * A line under the field for what is typed, such as why OK stays grey; null for none. Drawn as
+     * an error once something is typed, so an empty field starts with the hint and not a fault.
+     */
+    inputHint: ((String) -> String?)? = null,
+) {
+    val (textFieldValue, onTextFieldValueChange) = remember {
+        mutableStateOf(initialTextFieldValue)
+    }
+
+    val focusRequester = remember {
+        FocusRequester()
+    }
+
+    LaunchedEffect(Unit) {
+        delay(300)
+        focusRequester.requestFocus()
+    }
+
+    val buttons: @Composable () -> Unit = {
+        TextButton(modifier = Modifier.dpadFocusIndicator(),
+onClick = onDismiss) {
+            Text(text = stringResource(android.R.string.cancel))
+        }
+
+        TextButton(
+            modifier = Modifier.dpadFocusIndicator(),
+enabled = isInputValid(textFieldValue.text),
+            onClick = {
+                onDismiss()
+                onDone(textFieldValue.text)
+            }
+        ) {
+            Text(text = stringResource(android.R.string.ok))
+        }
+    }
+    val field: @Composable (Modifier, (@Composable () -> Unit)?) -> Unit = { fieldModifier, label ->
+        val hint = inputHint?.invoke(textFieldValue.text)
+        TextField(
+            value = textFieldValue,
+            onValueChange = onTextFieldValueChange,
+            label = label,
+            placeholder = placeholder,
+            singleLine = singleLine,
+            maxLines = maxLines,
+            supportingText = if (hint != null) ({ Text(hint) }) else null,
+            isError = hint != null && textFieldValue.text.isNotEmpty(),
+            colors = OutlinedTextFieldDefaults.colors(),
+            keyboardOptions = KeyboardOptions(
+                imeAction = if (singleLine) ImeAction.Done else ImeAction.None,
+                keyboardType = keyboardType
+            ),
+            keyboardActions = KeyboardActions(
+                // The same check as the confirm button, which is disabled for anything it rejects.
+                // Without it the keyboard's Done key saved a blank playlist name.
+                onDone = {
+                    if (isInputValid(textFieldValue.text)) {
+                        onDone(textFieldValue.text)
+                        onDismiss()
+                    }
+                }
+            ),
+            modifier = fieldModifier.focusRequester(focusRequester)
+        )
+    }
+
+    if (LocalLandscape.current.active) {
+        // On a phone on its side the keyboard leaves about 130dp of the window, and the dialog as
+        // it is upright (icon, title, field, buttons, one under the other) is 280dp. So it is one
+        // line there: the field, with the title as its label, and the buttons beside it. What
+        // still does not fit (a field of several lines, the switch under a new playlist's name)
+        // scrolls.
+        DefaultDialog(
+            onDismiss = onDismiss,
+            modifier = modifier,
+            scrollable = true,
+        ) {
+            Row(
+                verticalAlignment = if (singleLine) Alignment.CenterVertically else Alignment.Bottom,
+                modifier = Modifier.widthIn(max = Landscape.PanelMaxWidth)
+            ) {
+                field(Modifier.weight(1f), title)
+                buttons()
+            }
+
+            extraContent?.invoke()
+        }
+        return
+    }
+
+    DefaultDialog(
+        onDismiss = onDismiss,
+        modifier = modifier,
+        icon = icon,
+        title = title,
+        buttons = buttons
+    ) {
+        field(Modifier.weight(weight = 1f, fill = false), null)
+
+        extraContent?.invoke()
+    }
+}
+
+/**
+ * Dialog for user interaction
+ *
+ * @param title Title of prompt
+ * @param titleBar Title of prompt. Specifying this will override title
+ * @param onDismiss
+ * @param onConfirm
+ * @param onReset
+ * @param onCancel
+ * @param content
+ */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun ActionPromptDialog(
+    title: String? = null,
+    titleBar: @Composable (RowScope.() -> Unit)? = null,
+    onDismiss: () -> Unit,
+    onConfirm: () -> Unit,
+    onReset: (() -> Unit)? = null,
+    onCancel: (() -> Unit)? = null,
+    isInputValid: Boolean = true,
+    content: @Composable ColumnScope.() -> Unit = {}
+) = BasicAlertDialog(
+    onDismissRequest = { onDismiss() },
+    content = {
+        Column(
+            modifier = Modifier
+                .background(
+                    MaterialTheme.colorScheme.background,
+                    RoundedCornerShape(DialogCornerRadius)
+                )
+                .fillMaxWidth(0.8f)
+                .padding(16.dp)
+        ) {
+            // Weighted, so the buttons below are measured first and always stay on screen. A tall
+            // body (Arrange tabs, Lyrics sources) on a phone on its side at a large font pushed
+            // Reset, Cancel and OK out of the dialog, and only Back was left.
+            Column(modifier = Modifier.weight(1f, fill = false).padding(12.dp)) {
+                // title
+                if (titleBar != null) {
+                    Row {
+                        titleBar()
+                    }
+                } else if (title != null) {
+                    Text(
+                        text = title,
+                        overflow = TextOverflow.Ellipsis,
+                        maxLines = 1,
+                        style = MaterialTheme.typography.titleLarge,
+                    )
+                }
+
+                content() // body
+            }
+
+            // bottom options
+            // always have an ok, but explicit cancel/reset is optional
+            ButtonsRow(
+                modifier = Modifier.fillMaxWidth(),
+                // Reset at the start, the others at the end.
+                start = {
+                    if (onReset != null) {
+                        TextButton(
+                            modifier = Modifier.dpadFocusIndicator(),
+onClick = { onReset() },
+                        ) {
+                            Text(stringResource(R.string.reset))
+                        }
+                    }
+                },
+            ) {
+                if (onCancel != null) {
+                    TextButton(
+                        modifier = Modifier.dpadFocusIndicator(),
+onClick = { onCancel() }
+                    ) {
+                        Text(stringResource(android.R.string.cancel))
+                    }
+                }
+
+                TextButton(
+                    modifier = Modifier.dpadFocusIndicator(),
+onClick = { onConfirm() },
+                    enabled = isInputValid
+                ) {
+                    Text(stringResource(android.R.string.ok))
+                }
+            }
+        }
+    }
+)
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun CounterDialog(
+    title: String,
+    description: String? = null,
+    initialValue: Int,
+    upperBound: Int = 100,
+    lowerBound: Int = 0,
+    unitDisplay: String = "",
+    onDismiss: () -> Unit,
+    onConfirm: (Int) -> Unit,
+    onReset: (() -> Unit)? = null,
+    onCancel: (() -> Unit)? = null,
+) = BasicAlertDialog(
+    onDismissRequest = { onDismiss() },
+    content = {
+        val tempValue = rememberSaveable {
+            mutableIntStateOf(initialValue)
+        }
+        Column(
+            modifier = Modifier
+                .background(
+                    MaterialTheme.colorScheme.background,
+                    RoundedCornerShape(DialogCornerRadius)
+                )
+                .fillMaxWidth(0.8f)
+                .padding(16.dp)
+        ) {
+            Column(modifier = Modifier.padding(12.dp)) {
+                // title and description
+                Text(
+                    text = title,
+                    overflow = TextOverflow.Ellipsis,
+                    maxLines = 1,
+                    style = MaterialTheme.typography.titleLarge,
+                )
+                if (description != null) {
+                    Text(
+                        text = description,
+                        style = MaterialTheme.typography.bodySmall,
+                        modifier = Modifier.padding(horizontal = 4.dp)
+                    )
+                }
+
+                // slider and value display
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text(
+                        text = "${tempValue.intValue}$unitDisplay",
+                        style = MaterialTheme.typography.bodyMedium,
+                        modifier = Modifier.padding(horizontal = 8.dp)
+                    )
+                    Slider(
+                        value = tempValue.intValue.toFloat(),
+                        onValueChange = { tempValue.intValue = it.toInt() },
+                        valueRange = lowerBound.toFloat()..upperBound.toFloat()
+                    )
+                }
+
+                // bottom options
+                // always have an ok, but explicit cancel/reset is optional
+                ButtonsRow(
+                    modifier = Modifier.fillMaxWidth(),
+                    // Reset at the start, the others at the end.
+                    start = {
+                        if (onReset != null) {
+                            TextButton(
+                                modifier = Modifier.dpadFocusIndicator(),
+onClick = { onReset() },
+                            ) {
+                                Text(stringResource(R.string.reset))
+                            }
+                        }
+                    },
+                ) {
+                    TextButton(
+                        modifier = Modifier.dpadFocusIndicator(),
+onClick = { onConfirm(tempValue.intValue) }
+                    ) {
+                        Text(stringResource(android.R.string.ok))
+                    }
+
+                    if (onCancel != null)
+                        TextButton(
+                            modifier = Modifier.dpadFocusIndicator(),
+onClick = { onCancel() }
+                        ) {
+                            Text(stringResource(android.R.string.cancel))
+                        }
+                }
+            }
+        }
+    }
+)
+
+@Composable
+fun DetailsDialog(
+    mediaMetadata: MediaMetadata,
+    currentFormat: FormatEntity?,
+    currentPlayCount: Int?,
+    clipboardManager: Clipboard,
+    setVisibility: (newState: Boolean) -> Unit,
+) {
+    val context = LocalContext.current
+    val coroutineScope = rememberCoroutineScope()
+    val snackbarHostState = LocalSnackbarHostState.current
+
+    AlertDialog(
+        properties = DialogProperties(usePlatformDefaultWidth = false),
+        onDismissRequest = { setVisibility(false) },
+        icon = {
+            Icon(
+                imageVector = Icons.Rounded.Info,
+                contentDescription = null
+            )
+        },
+        confirmButton = {
+            TextButton(
+                modifier = Modifier.dpadFocusIndicator(),
+onClick = { setVisibility(false) }
+            ) {
+                Text(stringResource(android.R.string.ok))
+            }
+        },
+        text = {
+            Column(
+                modifier = Modifier
+                    .sizeIn(minWidth = 280.dp, maxWidth = 560.dp)
+                    .verticalScroll(rememberScrollState())
+            ) {
+                val details = mutableListOf(
+                    stringResource(R.string.song_title) to mediaMetadata.title,
+                    stringResource(R.string.song_artists) to mediaMetadata.artists?.joinToString { it.name },
+                    stringResource(R.string.media_id) to mediaMetadata.id,
+                    stringResource(R.string.play_count) to currentPlayCount.toString()
+                )
+
+                if (!mediaMetadata.isLocal) {
+                    details.add("Itag" to currentFormat?.itag?.toString())
+                } else {
+                    mediaMetadata.trackNumber?.let {
+                        details.add(stringResource(R.string.track_number) to it.toString())
+                    }
+                    mediaMetadata.discNumber?.let {
+                        details.add(stringResource(R.string.disc_number) to it.toString())
+                    }
+                    details.add(stringResource(R.string.sort_by_date_released) to mediaMetadata.getDateString())
+                    details.add(stringResource(R.string.sort_by_date_modified) to mediaMetadata.getDateModifiedString())
+                }
+
+                details.addAll(
+                    mutableListOf(
+                        stringResource(R.string.mime_type) to currentFormat?.mimeType,
+                        stringResource(R.string.codecs) to currentFormat?.codecs?.takeIf { it.isNotBlank() },
+                        stringResource(R.string.bitrate) to currentFormat?.bitrate?.let { "${it / 1000} Kbps" },
+                        stringResource(R.string.sample_rate) to currentFormat?.sampleRate?.let { "$it Hz" },
+                        stringResource(R.string.bits_per_sample) to (currentFormat?.bitsPerSample?.toString()
+                            ?: stringResource(R.string.unknown)),
+                    )
+                )
+
+                if (!mediaMetadata.isLocal) {
+                    details.add(stringResource(R.string.loudness) to currentFormat?.loudnessDb?.let { "$it dB" })
+                }
+
+                details.addAll(
+                    mutableListOf(
+                        stringResource(R.string.file_size) to currentFormat?.contentLength?.let {
+                            if (mediaMetadata.isLocal && mediaMetadata.localPath != null && File(mediaMetadata.localPath).exists()) {
+                                Formatter.formatShortFileSize(
+                                    context,
+                                    File(mediaMetadata.localPath).length() * (1024 / 1000)
+                                )
+                            } else if (it > 0) {
+                                // A stream whose size YouTube never sent is stored as 0
+                                // (contentLengthOrZero): unknown, not 0 B.
+                                Formatter.formatShortFileSize(context, it)
+                            } else {
+                                null
+                            }
+                        }
+                    ))
+
+                if (mediaMetadata.isLocal) {
+                    details.add(stringResource(R.string.file_path) to mediaMetadata.localPath)
+                }
+
+                currentFormat?.extraComment?.let {
+                    details.add(stringResource(R.string.extra_details) to it)
+                }
+
+                details.forEach { (label, text) ->
+                    val displayText = text ?: stringResource(R.string.unknown)
+                    Text(
+                        text = label,
+                        style = MaterialTheme.typography.labelMedium
+                    )
+                    Text(
+                        text = displayText,
+                        style = MaterialTheme.typography.titleMedium,
+                        modifier = Modifier.clickable(
+                            interactionSource = remember { MutableInteractionSource() },
+                            indication = null,
+                            onClick = {
+                                val clipData = ClipData.newPlainText(label, AnnotatedString(displayText))
+                                clipboardManager.nativeClipboard.setPrimaryClip(clipData)
+
+                                coroutineScope.launch {
+                                    val job = launch {
+                                        snackbarHostState.showSnackbar(
+                                            message = context.getString(R.string.copied),
+                                            withDismissAction = true,
+                                            duration = SnackbarDuration.Indefinite
+                                        )
+                                    }
+                                    delay(SNACKBAR_VERY_SHORT)
+                                    job.cancel()
+                                }
+                            }
+                        )
+                    )
+                    Spacer(Modifier.height(8.dp))
+                }
+            }
+        },
+        containerColor = MaterialTheme.colorScheme.background,
+        shape = RoundedCornerShape(DialogCornerRadius)
+    )
+}
+
+@Composable
+fun InfoLabel(
+    text: String,
+    modifier: Modifier = Modifier,
+    isError: Boolean = false,
+) = Row(
+    verticalAlignment = Alignment.CenterVertically,
+    modifier = modifier.padding(horizontal = 8.dp)
+) {
+    Icon(
+        if (isError) Icons.Outlined.Error else Icons.Outlined.Info,
+        contentDescription = null,
+        tint = if (isError) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.secondary,
+        modifier = Modifier.padding(4.dp)
+    )
+    Text(
+        text = text,
+        style = MaterialTheme.typography.bodySmall,
+        modifier = Modifier.padding(horizontal = 4.dp)
+    )
+}

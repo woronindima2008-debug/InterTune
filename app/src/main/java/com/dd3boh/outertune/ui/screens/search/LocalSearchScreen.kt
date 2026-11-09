@@ -1,0 +1,288 @@
+package com.dd3boh.outertune.ui.screens.search
+
+import com.dd3boh.outertune.ui.utils.dpadFocusIndicator
+import androidx.compose.foundation.interaction.DragInteraction
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.WindowInsetsSides
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.only
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.windowInsetsPadding
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.rounded.NavigateNext
+import androidx.compose.material.icons.rounded.Search
+import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.snapshotFlow
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.unit.dp
+import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
+import androidx.navigation.NavController
+import com.dd3boh.outertune.LocalPlayerAwareWindowInsets
+import com.dd3boh.outertune.constants.PlayOrigin
+import com.dd3boh.outertune.LocalPlayerConnection
+import com.dd3boh.outertune.LocalSnackbarHostState
+import com.dd3boh.outertune.R
+import com.dd3boh.outertune.constants.CONTENT_TYPE_LIST
+import com.dd3boh.outertune.constants.ListItemHeight
+import com.dd3boh.outertune.constants.ListThumbnailSize
+import com.dd3boh.outertune.constants.SwipeToQueueKey
+import com.dd3boh.outertune.db.entities.Album
+import com.dd3boh.outertune.db.entities.Artist
+import com.dd3boh.outertune.db.entities.Playlist
+import com.dd3boh.outertune.db.entities.Song
+import com.dd3boh.outertune.models.toMediaMetadata
+import com.dd3boh.outertune.playback.queues.ListQueue
+import com.dd3boh.outertune.playback.queues.YouTubeQueue
+import com.dd3boh.outertune.ui.component.ChipsRow
+import com.dd3boh.outertune.ui.component.EmptyPlaceholder
+import com.dd3boh.outertune.ui.component.LazyColumnScrollbar
+import com.dd3boh.outertune.ui.component.items.AlbumListItem
+import com.dd3boh.outertune.ui.component.items.ArtistListItem
+import com.dd3boh.outertune.ui.component.items.PlaylistListItem
+import com.dd3boh.outertune.ui.component.items.SongListItem
+import com.dd3boh.outertune.utils.rememberPreference
+import com.dd3boh.outertune.viewmodels.LocalFilter
+import com.dd3boh.outertune.viewmodels.LocalSearchViewModel
+import com.dd3boh.outertune.ui.utils.itemsInColumns
+import com.dd3boh.outertune.ui.utils.rememberListColumns
+import kotlinx.coroutines.FlowPreview
+import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.flow.debounce
+import kotlin.math.roundToInt
+
+@OptIn(FlowPreview::class)
+@Composable
+fun LocalSearchScreen(
+    query: String,
+    navController: NavController,
+    onDismiss: () -> Unit,
+    viewModel: LocalSearchViewModel = hiltViewModel(),
+) {
+    val context = LocalContext.current
+    val density = LocalDensity.current
+    val keyboardController = LocalSoftwareKeyboardController.current
+    val playerConnection = LocalPlayerConnection.current ?: return
+
+    val swipeEnabled by rememberPreference(SwipeToQueueKey, true)
+
+    val isPlaying by playerConnection.isPlaying.collectAsState()
+    val mediaMetadata by playerConnection.mediaMetadata.collectAsState()
+
+    val searchFilter by viewModel.filter.collectAsState()
+    val result by viewModel.result.collectAsState()
+
+    val lazyListState = rememberLazyListState()
+    val snackbarHostState = LocalSnackbarHostState.current
+
+    // Only when the listener drags the results, as in OnlineSearchScreen. The scroll offset also
+    // moves when the results change under it, so watching it closed the keyboard mid-typing.
+    LaunchedEffect(lazyListState.interactionSource) {
+        lazyListState.interactionSource.interactions.collect { interaction ->
+            if (interaction is DragInteraction.Start) keyboardController?.hide()
+        }
+    }
+
+    LaunchedEffect(query) {
+        snapshotFlow { query }.debounce { 300L }.collectLatest {
+            viewModel.query.value = query
+        }
+    }
+
+    Column(
+        modifier = Modifier
+            .windowInsetsPadding(LocalPlayerAwareWindowInsets.current.only(WindowInsetsSides.Horizontal + WindowInsetsSides.Bottom))
+    ) {
+        ChipsRow(
+            chips = listOf(
+                LocalFilter.ALL to stringResource(R.string.filter_all),
+                LocalFilter.SONG to stringResource(R.string.filter_songs),
+                LocalFilter.ALBUM to stringResource(R.string.filter_albums),
+                LocalFilter.ARTIST to stringResource(R.string.filter_artists),
+                LocalFilter.PLAYLIST to stringResource(R.string.filter_playlists)
+            ),
+            currentValue = searchFilter,
+            onValueUpdate = { viewModel.filter.value = it }
+        )
+
+        // Two rows abreast when the phone is on its side, one otherwise (Landscape.kt).
+        val columns = rememberListColumns()
+        LazyColumn(
+            state = lazyListState,
+//            contentPadding = LocalPlayerAwareWindowInsets.current.only(WindowInsetsSides.Bottom + WindowInsetsSides.Start).asPaddingValues(),
+            modifier = Modifier.weight(1f)
+        ) {
+            result.map.forEach { (filter, items) ->
+                if (result.filter == LocalFilter.ALL) {
+                    item(
+                        key = filter
+                    ) {
+                        Row(
+                            horizontalArrangement = Arrangement.spacedBy(16.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(ListItemHeight)
+                                .dpadFocusIndicator()
+                                .clickable { viewModel.filter.value = filter }
+                                .padding(start = 12.dp, end = 18.dp)
+                        ) {
+                            Text(
+                                text = stringResource(
+                                    when (filter) {
+                                        LocalFilter.SONG -> R.string.filter_songs
+                                        LocalFilter.ALBUM -> R.string.filter_albums
+                                        LocalFilter.ARTIST -> R.string.filter_artists
+                                        LocalFilter.PLAYLIST -> R.string.filter_playlists
+                                        LocalFilter.ALL -> error("")
+                                    }
+                                ),
+                                style = MaterialTheme.typography.titleLarge,
+                                modifier = Modifier.weight(1f)
+                            )
+
+                            Icon(
+                                Icons.AutoMirrored.Rounded.NavigateNext,
+                                contentDescription = null
+                            )
+                        }
+                    }
+                }
+
+                val thumbnailSize = (ListThumbnailSize.value * density.density).roundToInt()
+                itemsInColumns(
+                    items = items,
+                    columns = columns,
+                    key = { _, item -> item.id },
+                    contentType = { _, _ -> CONTENT_TYPE_LIST }
+                ) { _, item ->
+                    when (item) {
+                        is Song -> {
+                            SongListItem(
+                                song = item,
+                                navController = navController,
+                                snackbarHostState = snackbarHostState,
+
+                                isActive = item.id == mediaMetadata?.id,
+                                isPlaying = isPlaying,
+                                inSelectMode = false,
+                                isSelected = false,
+                                onSelectedChange = { },
+                                swipeEnabled = swipeEnabled,
+
+                                thumbnailSize = thumbnailSize,
+                                onPlay = {
+                                    // Play the song that was tapped, not the search.
+                                    //
+                                    // Queueing every other result behind it is what online search
+                                    // did until 4 Sep, and it is the one behaviour nobody asks
+                                    // for: search "3am", tap one, get nineteen unrelated songs
+                                    // called "3am" queued after it.
+                                    //
+                                    // Online search continues into a radio. That needs a YouTube
+                                    // id, which a local file does not have, so a song that lives
+                                    // only on the device plays on its own and stops. Anything with
+                                    // a YouTube id gets the same radio as everywhere else.
+                                    val metadata = item.toMediaMetadata()
+                                    if (metadata.isLocal) {
+                                        playerConnection.playQueue(
+                                            ListQueue(
+                                                title = metadata.title,
+                                                items = listOf(metadata),
+                                            ),
+                                            origin = PlayOrigin.SEARCH,
+                                        )
+                                    } else {
+                                        playerConnection.playQueue(
+                                            YouTubeQueue.radio(metadata),
+                                            isRadio = true,
+                                            origin = PlayOrigin.SEARCH,
+                                        )
+                                    }
+                                },
+                                modifier = Modifier.animateItem()
+                            )
+                        }
+
+                        is Album -> AlbumListItem(
+                            album = item,
+                            isActive = item.id == mediaMetadata?.album?.id,
+                            isPlaying = isPlaying,
+                            modifier = Modifier
+                                .clickable {
+                                    onDismiss()
+                                    navController.navigate("album/${item.id}")
+                                }
+                                .animateItem()
+                        )
+
+                        is Artist -> ArtistListItem(
+                            artist = item,
+                            modifier = Modifier
+                                .clickable {
+                                    onDismiss()
+                                    navController.navigate("artist/${item.id}")
+                                }
+                                .animateItem()
+                        )
+
+                        is Playlist -> PlaylistListItem(
+                            playlist = item,
+                            modifier = Modifier
+                                .clickable {
+                                    onDismiss()
+                                    navController.navigate(item.navigationRoute)
+                                }
+                                .animateItem()
+                        )
+                    }
+                }
+            }
+
+            if (result.query.isNotEmpty() && result.map.isEmpty()) {
+                item(
+                    key = "no_result"
+                ) {
+                    EmptyPlaceholder(
+                        icon = Icons.Rounded.Search,
+                        text = stringResource(R.string.no_results_found),
+                        modifier = Modifier.animateItem()
+                    )
+                }
+            }
+        }
+    }
+    LazyColumnScrollbar(
+        state = lazyListState,
+    )
+
+    Box(
+        modifier = Modifier.fillMaxSize()
+    ) {
+        SnackbarHost(
+            hostState = snackbarHostState,
+            modifier = Modifier
+                .windowInsetsPadding(LocalPlayerAwareWindowInsets.current)
+                .align(Alignment.BottomCenter)
+        )
+    }
+}

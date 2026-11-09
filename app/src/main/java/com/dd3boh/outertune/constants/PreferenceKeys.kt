@@ -1,0 +1,1018 @@
+package com.dd3boh.outertune.constants
+
+import androidx.datastore.preferences.core.booleanPreferencesKey
+import androidx.datastore.preferences.core.floatPreferencesKey
+import androidx.datastore.preferences.core.intPreferencesKey
+import androidx.datastore.preferences.core.longPreferencesKey
+import androidx.datastore.preferences.core.stringPreferencesKey
+import androidx.datastore.preferences.core.stringSetPreferencesKey
+
+/**
+ * Appearance
+ */
+val DynamicThemeKey = booleanPreferencesKey("dynamicTheme")
+val HighContrastKey = booleanPreferencesKey("highContrast")
+val PlayerBackgroundStyleKey = stringPreferencesKey("playerBackgroundStyle")
+// playerGlass was the separate "vivid player background" switch, folded into
+// PlayerLiquidGlassKey. The stored value is left alone rather than migrated: it is a boolean
+// nobody reads now, and deleting user data to tidy a key is not worth it.
+val PlayerGlassIntensityKey = floatPreferencesKey("playerGlassIntensity")
+
+/** How strongly the Living blur background answers the music, 0 to 1 (LivingField.reach). */
+val LivingStrengthKey = floatPreferencesKey("livingBlurStrength")
+
+/** How softly it follows the music, 0 to 1 (LivingField.ease). */
+val LivingSmoothingKey = floatPreferencesKey("livingBlurSmoothing")
+
+/** What it is coloured from: a LivingColours. */
+val LivingColoursKey = stringPreferencesKey("livingBlurColours")
+val PlayerLiquidGlassKey = booleanPreferencesKey("playerLiquidGlass")
+val DarkModeKey = stringPreferencesKey("darkMode")
+val PureBlackKey = booleanPreferencesKey("pureBlack")
+/** The Animations switch, on by default: off, nothing in the app animates (Animations). */
+val AnimationsKey = booleanPreferencesKey("animations")
+val BackAnimationsKey = booleanPreferencesKey("backAnimations")
+val ShowLikedAndDownloadedPlaylist = booleanPreferencesKey("showLikedAndDownloadedPlaylist")
+/** What Home, search, artist pages and radio leave out (ContentFilter). Both off by default. */
+val HideExplicitKey = booleanPreferencesKey("hideExplicit")
+val HideVideoSongsKey = booleanPreferencesKey("hideVideoSongs")
+/** The artists the listener blocked, as ArtistBlock.encode writes them (Unreleased.ARTIST_BLOCK). None by default. */
+val BlockedArtistsKey = stringPreferencesKey("blockedArtists")
+val SwipeToQueueKey = booleanPreferencesKey("swipeToQueue")
+val FlatSubfoldersKey = booleanPreferencesKey("flatSubfolders")
+val TabletUiKey = booleanPreferencesKey("tabletUi")
+
+val EnabledTabsKey = stringPreferencesKey("enabledTabs")
+val EnabledFiltersKey = stringPreferencesKey("enabledFilters")
+val DefaultOpenTabKey = stringPreferencesKey("defaultOpenTab")
+val SlimNavBarKey = booleanPreferencesKey("slimNavBar")
+
+/**
+ * Content
+ */
+const val SYSTEM_DEFAULT = "SYSTEM_DEFAULT"
+val YtmSyncKey = booleanPreferencesKey("ytmSync")
+val YtmSyncContentKey = stringPreferencesKey("ytmSyncContent")
+val YtmSyncModeKey = stringPreferencesKey("ytmSyncMode")
+val YtmSyncConflictKey = stringPreferencesKey("ytmSyncConflict")
+val LikedAutoDownloadKey = stringPreferencesKey("likedAutoDownloadKey")
+/** Whether taking back a like removes the download that LikedAutoDownloadKey made for the song (issue #64): LikedDownloads. */
+val LikedDownloadSyncKey = booleanPreferencesKey("likedDownloadSync")
+/** The songs LikedAutoDownloadKey downloaded itself, by id, so that an unlike removes those and never one downloaded by hand. */
+val LikedAutoDownloadedKey = stringSetPreferencesKey("likedAutoDownloaded")
+val ContentLanguageKey = stringPreferencesKey("contentLanguage")
+val ContentCountryKey = stringPreferencesKey("contentCountry")
+/** The country the note about YouTube Music with no free plan was sent away for: YouTubeRegion. */
+val RegionNoteDoneKey = stringPreferencesKey("regionNoteDone")
+val ProxyEnabledKey = booleanPreferencesKey("proxyEnabled")
+val ProxyUrlKey = stringPreferencesKey("proxyUrl")
+val ProxyTypeKey = stringPreferencesKey("proxyType")
+
+// sync time tracks
+// Stored name kept from when this only governed the Quick picks row, so that widening it to
+// the whole home screen does not silently reset the choice of anyone already on "Your library".
+val QuickPicksSourceKey = stringPreferencesKey("quickPicksSource")
+val LastFullSyncKey = longPreferencesKey("lastFullSync")
+val LastLikeSongSyncKey = longPreferencesKey("lastLikeSongSync")
+val LastLibSongSyncKey = longPreferencesKey("lastLibSongSync")
+val LastAlbumSyncKey = longPreferencesKey("lastAlbumSync")
+val LastArtistSyncKey = longPreferencesKey("lastArtistSync")
+val LastPlaylistSyncKey = longPreferencesKey("lastPlaylistSync")
+val LastRecentActivitySyncKey = longPreferencesKey("lastRecentActivitySync")
+
+
+/**
+ * Player & audio
+ */
+val AudioDecoderKey = intPreferencesKey("audioDecoder")
+val AudioQualityKey = stringPreferencesKey("audioQuality")
+val AudioOffloadKey = booleanPreferencesKey("enableOffload")
+
+/**
+ * Battery use, a BatteryMode by name. Never written but by its own row, and never written for
+ * anybody who has not picked one: absent, it reads as Balanced (BatteryUse.DEFAULT), so an update
+ * is on Balanced without anything stored.
+ */
+val BatteryModeKey = stringPreferencesKey("batteryMode")
+
+/**
+ * Whether Battery use runs as Saver while the phone's own battery saver is on (PhoneBatterySaver).
+ * Never written but by its own switch: absent, it reads as on (BatteryUse.FOLLOW_PHONE_DEFAULT).
+ */
+val FollowPhoneSaverKey = booleanPreferencesKey("batteryFollowPhoneSaver")
+
+/**
+ * Whether InterTune gives up audio focus, so another app's sound can play at the same time.
+ *
+ * Off by default, and it has to stay that way. Audio focus is also what pauses the music for a
+ * phone call, ducks it for a navigation prompt and stops it for an alarm. Turning this on trades
+ * all of that away, which is why the description says so in as many words.
+ */
+val ShareAudioFocusKey = booleanPreferencesKey("shareAudioFocus")
+
+/**
+ * Last.fm.
+ *
+ * The session key does not expire, so it is the whole of the login: present means connected,
+ * absent means not. There is no password here and never will be; the browser flow is what
+ * produces this value. [LastFmUsernameKey] exists only so the settings screen can say whose
+ * account it is without a round trip.
+ */
+val LastFmSessionKey = stringPreferencesKey("lastFmSession")
+val LastFmUsernameKey = stringPreferencesKey("lastFmUsername")
+
+/** Scrobbling can be paused without disconnecting the account. */
+val LastFmScrobbleKey = booleanPreferencesKey("lastFmScrobble")
+val AudioGaplessOffloadKey = booleanPreferencesKey("enableGaplessOffload")
+
+val MaxQueuesKey = intPreferencesKey("maxQueues")
+val PersistentQueueKey = booleanPreferencesKey("persistentQueue")
+
+/**
+ * The id of the queue playing, for the next start (QueueBoard.notePlaying). The list of queues keeps
+ * the order it is dragged into, so the last queue in it is not always the one playing. Missing, or
+ * naming a queue that is gone, the last queue is taken, as it always was.
+ */
+val PlayingQueueKey = longPreferencesKey("playingQueue")
+
+/**
+ * Start playing the restored queue as soon as the app opens, rather than waiting to be told.
+ *
+ * Off by default and it must stay that way. This is sound without anybody pressing anything, and
+ * upstream #1132 asks for it from a car head unit, which is exactly where taking audio focus off a
+ * navigation prompt would be worst.
+ */
+val ResumePlaybackOnLaunchKey = booleanPreferencesKey("resumePlaybackOnLaunch")
+
+/**
+ * Start the music again when Bluetooth audio connects, if it stopped because the headphones, the
+ * car or the speaker it was playing through went away (BluetoothResume).
+ *
+ * Off by default, like the one above and for the same reason: it is sound without anybody
+ * pressing anything. Only music the output's going stopped is ever started again, and only by a
+ * playback service that is still running.
+ */
+val ResumeOnBluetoothKey = booleanPreferencesKey("resumeOnBluetooth")
+
+val SeekIncrementKey = stringPreferencesKey("seekIncrement")
+val SkipSilenceKey = booleanPreferencesKey("skipSilence")
+val SkipOnErrorKey = booleanPreferencesKey("skipOnError")
+val AudioNormalizationKey = booleanPreferencesKey("audioNormalization")
+val AutoLoadMoreKey = booleanPreferencesKey("autoLoadMore")
+val KeepAliveKey = booleanPreferencesKey("keepAlive")
+val StopMusicOnTaskClearKey = booleanPreferencesKey("stopMusicOnTaskClear")
+
+val PlayerVolumeKey = floatPreferencesKey("playerVolume")
+val RepeatModeKey = intPreferencesKey("repeatMode")
+val LockQueueKey = booleanPreferencesKey("lockQueue")
+val minPlaybackDurKey = intPreferencesKey("minPlaybackDur")
+val SleepTimerFadeKey = booleanPreferencesKey("sleepTimerFade")
+val SleepTimerFadeDurationKey = intPreferencesKey("sleepTimerFadeDuration")
+
+/**
+ * The sleep timer on a schedule (ScheduledSleep): off by default, from 23:00, for 30 minutes. The
+ * start is in minutes after midnight and the length in minutes.
+ */
+val SleepScheduleKey = booleanPreferencesKey("sleepSchedule")
+val SleepScheduleStartKey = intPreferencesKey("sleepScheduleStart")
+val SleepScheduleLengthKey = intPreferencesKey("sleepScheduleLength")
+
+/**
+ * The day the schedule last served, as an ISO date, so that it starts once a day and a restart of
+ * the app in the evening does not give the music a second timer. Written by the service only.
+ */
+val SleepScheduleLastNightKey = stringPreferencesKey("sleepScheduleLastNight")
+
+/**
+ * Whether each song fades out at its end and the next one fades in.
+ *
+ * Off by default. The songs never overlap, so it is not a crossfade and the setting does not call
+ * itself one. Two songs from the same album are left alone, so an album that runs straight from
+ * one track into the next still does. See TransitionFade.
+ */
+val TransitionFadeKey = booleanPreferencesKey("transitionFade")
+
+/** How long each fade lasts, in seconds. One of TransitionFadeEnvelope.SECONDS_CHOICES. */
+val TransitionFadeSecondsKey = intPreferencesKey("transitionFadeSeconds")
+
+
+/**
+ * Lyrics
+ */
+val ShowLyricsKey = booleanPreferencesKey("showLyrics")
+val LyricsTextPositionKey = stringPreferencesKey("lyricsTextPosition")
+val MultilineLrcKey = booleanPreferencesKey("multilineLrc")
+val LyricTrimKey = booleanPreferencesKey("lyricTrim")
+/**
+ * How far each song's synced lyrics are moved against it, as "songId=ms" pairs joined by commas
+ * (LyricsTiming): only the songs somebody moved, so a handful of entries, kept with the settings so
+ * that a backup carries them.
+ */
+val LyricsTimingKey = stringPreferencesKey("lyricsTiming")
+/** True once the moves in [LyricsTimingKey] were made 100 ms later for the lyrics clock put right (LyricsTimingOnTime). */
+val LyricsTimingOnTimeKey = booleanPreferencesKey("lyricsTimingOnTime")
+val LyricSourcePrefKey = booleanPreferencesKey("preferLocalLyrics")
+val LyricFontSizeKey = intPreferencesKey("lyricFontSize")
+val LyricClickable = booleanPreferencesKey("lyricClickable")
+/** Synced lyrics scroll to the line being sung; off, they are placed on it once and then left where the listener leaves them. */
+val LyricAutoScrollKey = booleanPreferencesKey("lyricAutoScroll")
+val LyricKaraokeEnable = booleanPreferencesKey("lyricKaraokeEnable")
+val LyricUpdateSpeed = stringPreferencesKey("lyricUpdateSpeed")
+
+/**
+ * Show in Latin letters: a line in Japanese, Korean, Chinese, Cyrillic, Greek or an Indian script
+ * gets its Latin version under it (LyricsLatin). Off by default, and not offered below Android 10.
+ */
+val LyricLatinKey = booleanPreferencesKey("lyricLatin")
+
+
+/**
+ * Storage
+ */
+val DownloadExtraPathKey = stringPreferencesKey("dlExtraPath") // previously "downloadExtraPath"
+val DownloadPathKey = stringPreferencesKey("dlPath") // previously "downloadPath"
+val DownloadOnWifiOnlyKey = booleanPreferencesKey("downloadOnWifiOnly")
+val MaxImageCacheSizeKey = intPreferencesKey("maxImageCacheSize")
+
+/**
+ * The song cache's size in MB: 0 is off, -1 has no limit. A new install starts with 256 written in
+ * (NewInstallSongCache). An older install that never picked a size has none, which every reader
+ * takes as 0, off, as it always did there, but while Battery use is on Saver, which keeps 512 MB
+ * then (BatteryUse.songCacheMb, never written here).
+ */
+val MaxSongCacheSizeKey = intPreferencesKey("maxSongCacheSize")
+
+/**
+ * Automatic backups.
+ *
+ * Off by default and opt in: a schedule that writes files to a folder is not something to switch on
+ * for somebody. The folder is the tree uri the system picker handed back, kept as text because that
+ * is what the persisted permission is keyed on. The last run and its result are here so the settings
+ * screen can say what happened without sending the user to look in the folder. The last folder is
+ * where the last successful backup went, so that turning backups on can tell whether the folder
+ * set now has one (AutoBackupPolicy.backUpAtOnce). Backups from before it was recorded have none.
+ */
+val AutoBackupEnabledKey = booleanPreferencesKey("autoBackupEnabled")
+val AutoBackupFolderKey = stringPreferencesKey("autoBackupFolder")
+val AutoBackupIntervalHoursKey = intPreferencesKey("autoBackupIntervalHours")
+val AutoBackupKeepKey = intPreferencesKey("autoBackupKeep")
+val AutoBackupLastRunKey = longPreferencesKey("autoBackupLastRun")
+val AutoBackupLastResultKey = stringPreferencesKey("autoBackupLastResult")
+val AutoBackupLastFolderKey = stringPreferencesKey("autoBackupLastFolder")
+
+
+/**
+ * Privacy
+ */
+val PauseListenHistoryKey = booleanPreferencesKey("pauseListenHistory")
+/** No song twice on Home, no version beside its original, nothing just played in Quick picks. */
+val TidyHomeRowsKey = booleanPreferencesKey("tidyHomeRows")
+/** Order the chosen source's Quick picks by the engine's score, whatever the source. */
+val RankWithListeningKey = booleanPreferencesKey("rankWithListening")
+/** Captions under engine cards saying why each is there. */
+val ShowReasonsKey = booleanPreferencesKey("showReasons")
+/** Adventurousness 0 to 100: how much of the engine row is new artists. */
+val AdventurousnessKey = intPreferencesKey("adventurousness")
+
+/** The middle of the slider, two explore cards of twenty: see EngineParams.exploreSpan. */
+const val DefaultAdventurousness = 50
+/** The engine row holds only songs new to the listener. */
+val NewSongsOnlyKey = booleanPreferencesKey("newSongsOnly")
+/** A second engine row on Home, under Quick picks, of songs never played. On unless turned off. */
+val DiscoverRowKey = booleanPreferencesKey("discoverRow")
+/** Familiarity 0 to 60: the share of the engine row given to songs heard well lately. */
+val FamiliarityKey = intPreferencesKey("familiarity")
+/**
+ * The old switch for Last.fm's similar tracks instead of YouTube's related lists. Nothing writes
+ * it any more; it is read only while [SimilarSourceKey] is unset, so a listener who turned it on
+ * keeps Last.fm only. See SimilarSources.stored.
+ */
+val SimilarFromLastFmKey = booleanPreferencesKey("similarFromLastFm")
+/** Where the engine's similar songs come from, a SimilarSource name. Unset means the old switch decides, and YouTube only without it. */
+val SimilarSourceKey = stringPreferencesKey("similarSource")
+/**
+ * Whether the Favourite artists mix keeps to the bookmarked artists. Off, and artists YouTube lists
+ * beside them join in as guests (FavouritesGuests). On unless turned off, which is the mix as it
+ * was before there were guests.
+ */
+val FavouritesStrictKey = booleanPreferencesKey("favouritesStrict")
+/** When the Last.fm catch-up last finished, so it runs once even for a listener who never changes the setting. */
+val LastFmCaughtUpAtKey = longPreferencesKey("lastFmCaughtUpAt")
+/** Build the engine row in the background while another source is showing, to compare a day later. */
+val ShadowComparisonKey = booleanPreferencesKey("shadowComparison")
+/** A skip before the middle of a liked or often-played song rests it from the engine row for a week. */
+val RestSongsISkipKey = booleanPreferencesKey("restSongsISkip")
+/** Rests filter the YouTube and library rows too, not only the engine's. */
+val RestsEverywhereKey = booleanPreferencesKey("restsEverywhere")
+/** The declared context chip above the engine row, kept until changed: 0 Auto, 1 Discover, 2 Favourites, 3 Focus, 4 Chill, 5 Party. */
+val ContextChipKey = intPreferencesKey("contextChip")
+/**
+ * What Best recommendations leans toward, a standing choice: a [com.dd3boh.outertune.engine.Lean]
+ * name. Unset or unknown means Auto, the usual mix, so nothing changes for anyone who never picks.
+ */
+val QuickPicksLeanKey = stringPreferencesKey("quickPicksLean")
+/** Developer overrides of EngineParams, as one JSON object of name to value. */
+val EngineOverridesKey = stringPreferencesKey("engineOverrides")
+/** Off freezes the engine's weights and stops impressions; the listen log continues. */
+val LearnFromListeningKey = booleanPreferencesKey("learnFromListening")
+/** The local day (days since the epoch) and how much of the day's update budget is spent. */
+val EngineBudgetDayKey = longPreferencesKey("engineBudgetDay")
+val EngineBudgetSpentKey = floatPreferencesKey("engineBudgetSpent")
+/**
+ * What it has learned came from a copy loaded under Your data, so a forget, reset or rebuild
+ * throws that copy away, and its dialog says so. Cleared by each of those and by Clear listen
+ * history.
+ */
+val EngineCopyLoadedKey = booleanPreferencesKey("engineCopyLoaded")
+/** The day (in days since the epoch) and count of related-song refreshes spent, at most ten a day. */
+val RelatedRefreshDayKey = longPreferencesKey("relatedRefreshDay")
+val RelatedRefreshCountKey = intPreferencesKey("relatedRefreshCount")
+val PauseRemoteListenHistoryKey = booleanPreferencesKey("pauseRemoteListenHistory")
+val PauseSearchHistoryKey = booleanPreferencesKey("pauseSearchHistory")
+val EnableKugouKey = booleanPreferencesKey("enableKugou")
+val EnableLrcLibKey = booleanPreferencesKey("enableLrcLib")
+val EnableBetterLyricsKey = booleanPreferencesKey("enableBetterLyrics")
+val EnableYouTubeLyricsKey = booleanPreferencesKey("enableYouTubeLyrics")
+val EnableYouTubeCaptionsKey = booleanPreferencesKey("enableYouTubeCaptions")
+
+/** The order the lyrics sources are asked in: their ids joined by commas. See LyricsSources. */
+val LyricsSourceOrderKey = stringPreferencesKey("lyricsSourceOrder")
+
+/** The in-app equalizer (EqualizerAudioProcessor): on or off, and its ten gains as EqualizerPreset.format writes them. */
+val EqualizerEnabledKey = booleanPreferencesKey("equalizerEnabled")
+val EqualizerGainsKey = stringPreferencesKey("equalizerGains")
+/** The headphones the equalizer's curve was taken from (AutoEq.keep), shown while the curve is still theirs. */
+val EqualizerHeadphoneKey = stringPreferencesKey("equalizerHeadphone")
+val UseLoginForBrowse = booleanPreferencesKey("useLoginForBrowse")
+
+
+/**
+ * Local library
+ */
+val LocalLibraryEnableKey = booleanPreferencesKey("localLibraryEnable")
+
+
+/**
+ * Local media scanner
+ */
+val AutomaticScannerKey = booleanPreferencesKey("autoLocalScanner")
+val ScannerSensitivityKey = stringPreferencesKey("scannerSensitivity")
+val ScannerImplKey = stringPreferencesKey("scannerImpl")
+val ScannerStrictFilePathsKey = booleanPreferencesKey("scannerStrictFilePaths")
+val ScannerStrictExtKey = booleanPreferencesKey("scannerStrictExt")
+val LookupYtmArtistsKey = booleanPreferencesKey("lookupYtmArtists")
+
+val ScanPathsKey = stringPreferencesKey("inclScanPaths") // previously "scanPaths"
+val ExcludedScanPathsKey = stringPreferencesKey("exclScanPaths") // previously "excludedScanPaths"
+val LastLocalScanKey = longPreferencesKey("lastLocalScan")
+/** Whether the automatic scan has asked for the storage permission yet. It asks once; see scanInit. */
+val LocalMediaPermissionAskedKey = booleanPreferencesKey("localMediaPermissionAsked")
+/**
+ * Set once TrackTagReread has read the tags of the local songs that had no track or no disc number
+ * (issue #39). "trackTagsReread" was the pass of 0.12.5, which looked at the track numbers only.
+ */
+val TrackTagsRereadKey = booleanPreferencesKey("trackTagsRereadDiscs")
+
+/**
+ * Experimental settings
+ */
+val DevSettingsKey = booleanPreferencesKey("devSettings")
+val OobeStatusKey = intPreferencesKey("oobeStatus")
+
+/**
+ * Set when setup opens on an install that has never been through it, and removed when setup
+ * finishes. [OobeStatusKey] cannot tell by then: it is the page setup is on, and the configurator
+ * in Developer sets it back to 0 for somebody who has been through setup before. See markFirstSetup.
+ */
+val FirstSetupKey = booleanPreferencesKey("firstSetup")
+
+/**
+ * Set once this install has been told what signing in can cost: that YouTube may restrict or
+ * close an account used with the app. Setup says it on its sign-in page and the Account page in
+ * Settings says it beside the way in, so both set it. Whoever was signed in before either said
+ * anything is told once, in a dialog, on opening the app (accountNoticeOwed).
+ */
+val AccountNoticeSeenKey = booleanPreferencesKey("accountNoticeSeen")
+val SwipeToSkipKey = booleanPreferencesKey("swipeToSkip")
+
+/**
+ * Whether swiping the mini player downwards closes it and stops playback.
+ *
+ * Default true, which is the long-standing behaviour. Off leaves the mini player pinned: the drag
+ * still follows your finger, but letting go springs it back and the music keeps going. The gesture
+ * fires easily by accident when reaching for the mini player, and losing playback to a stray swipe
+ * is a poor trade for a shortcut.
+ *
+ * Implemented by withholding the sheet's onDismiss callback rather than by blocking the drag.
+ * BottomSheetState.performFling only dismisses when that callback is present and falls back to
+ * collapse() when it is not, so there is no second copy of the gesture logic to keep in step.
+ */
+val SwipeToDismissPlayerKey = booleanPreferencesKey("swipeToDismissPlayer")
+
+/**
+ * What Share sends for a song or an album: a ShareLinkKind. Unset, it reads as ShareLinks.START,
+ * nothing chosen yet, and the first share asks; the pick made there or in Settings is kept here.
+ */
+val ShareLinkKindKey = stringPreferencesKey("shareLinkKind")
+
+/**
+ * How Report a problem and the crash page send a report: a ReportWay. Unset, it reads as
+ * ReportWay.ANONYMOUS; the way last picked is kept for the next report (his rule of 28 Oct 2026:
+ * anonymous for people who would rather not sign in, the account way kept once someone picks it,
+ * and anonymous still one tap away).
+ */
+val ReportWayKey = stringPreferencesKey("reportWay")
+
+/**
+ * Whether the transport controls sit inside one shared panel, or stand on their own.
+ *
+ * Only visible when liquid glass is on, since that panel is the glass slab. Default true keeps the
+ * grouped look; off returns to free-standing buttons over the artwork.
+ */
+val GroupedPlayerControlsKey = booleanPreferencesKey("groupedPlayerControls")
+
+/** Which set of buttons the player shows. See [PlayerButtonsStyle]. */
+val PlayerButtonsStyleKey = stringPreferencesKey("playerButtonsStyle")
+
+/** The buttons the player keeps outside its menu, per place, as [com.dd3boh.outertune.ui.player.PlayerPins] writes them; today's until chosen. */
+val PlayerPinsKey = stringPreferencesKey("playerPins")
+
+/**
+ * Whether the player opens the queue from a button beside its other buttons, rather than from the
+ * sheet pulled up from its bottom edge. Off keeps the sheet, which is how the player has always
+ * worked, so nobody loses the gesture they know.
+ */
+val QueueButtonKey = booleanPreferencesKey("queueButton")
+
+/**
+ * Whether Back from the queue closes the whole player in one step, as two swipes down would, and
+ * leaves the queue open in it, so that the player opens on the queue next time (issue #30). Off by
+ * default: Back from the queue goes to the song first, as it always has, and a swipe down on the
+ * queue or a tap on its bar still does with it on.
+ */
+val QueueBackClosesPlayerKey = booleanPreferencesKey("queueBackClosesPlayer")
+
+/**
+ * Whether the queue was left open in the player, so that the player opens on it again after a
+ * restart. Written and read only while [QueueBackClosesPlayerKey] is on (queueLeftOpenToStore).
+ */
+val QueueLeftOpenKey = booleanPreferencesKey("queueLeftOpen")
+
+/**
+ * The two buttons the phone's media controls show beside previous, play and next, in order, as
+ * names joined by a comma. Missing means shuffle then repeat, which is what they always showed.
+ * See [com.dd3boh.outertune.playback.MediaControlButtons].
+ */
+val MediaControlButtonsKey = stringPreferencesKey("mediaControlButtons")
+
+
+/**
+ * Non-settings UI preferences
+ */
+val SongSortTypeKey = stringPreferencesKey("songSortType")
+val SongSortDescendingKey = booleanPreferencesKey("songSortDescending")
+val FolderSortTypeKey = stringPreferencesKey("folderSortType")
+val FolderSongSortTypeKey = stringPreferencesKey("folderSongSortType")
+val FolderSongSortDescendingKey = booleanPreferencesKey("folderSongSortDescending")
+val PlaylistSongSortTypeKey = stringPreferencesKey("playlistSongSortType")
+val PlaylistSongSortDescendingKey = booleanPreferencesKey("playlistSongSortDescending")
+val ArtistSortTypeKey = stringPreferencesKey("artistSortType")
+val ArtistSortDescendingKey = booleanPreferencesKey("artistSortDescending")
+val AlbumSortTypeKey = stringPreferencesKey("albumSortType")
+val AlbumSortDescendingKey = booleanPreferencesKey("albumSortDescending")
+val PlaylistSortTypeKey = stringPreferencesKey("playlistSortType")
+val PlaylistSortDescendingKey = booleanPreferencesKey("playlistSortDescending")
+val LibrarySortTypeKey = stringPreferencesKey("librarySortType")
+val LibrarySortDescendingKey = booleanPreferencesKey("librarySortDescending")
+val ArtistSongSortTypeKey = stringPreferencesKey("artistSongSortType")
+val ArtistSongSortDescendingKey = booleanPreferencesKey("artistSongSortDescending")
+
+val SongFilterKey = stringPreferencesKey("songFilter")
+val ArtistFilterKey = stringPreferencesKey("artistFilter")
+val ArtistViewTypeKey = stringPreferencesKey("artistViewType")
+val AlbumFilterKey = stringPreferencesKey("albumFilter")
+val PlaylistFilterKey = stringPreferencesKey("playlistFilter")
+val AlbumViewTypeKey = stringPreferencesKey("albumViewType")
+val PlaylistViewTypeKey = stringPreferencesKey("playlistViewType")
+val LibraryFilterKey = stringPreferencesKey("libraryFilter")
+val LibraryViewTypeKey = stringPreferencesKey("libraryViewType")
+
+val PlaylistEditLockKey = booleanPreferencesKey("playlistEditLock")
+
+val SearchSourceKey = stringPreferencesKey("searchSource")
+
+val VisitorDataKey = stringPreferencesKey("visitorData")
+
+/**
+ * Which client served the last song and when the others were refused, as StreamOrder.encode writes
+ * it, so the first song after a launch is asked of the client that worked before it.
+ */
+val StreamOrderKey = stringPreferencesKey("streamOrder")
+
+/**
+ * Songs whose own id YouTube no longer serves, each with the id it is played from, as
+ * StandInMemory.encode writes them. See StandIns.
+ */
+val StandInsKey = stringPreferencesKey("standIns")
+
+/**
+ * The developer options' "Ask YouTube Music's web client first": an experiment, in debug builds
+ * only. See Unreleased.WEB_CLIENT_FIRST.
+ */
+val WebClientFirstKey = booleanPreferencesKey("webClientFirst")
+
+/** The developer's switch that plays every song over SABR: see Unreleased.SABR. Read in a debug build only. */
+val SabrOnlyKey = booleanPreferencesKey("sabrOnly")
+
+/** The developer's switch that takes every direct address for refused, to see SABR's rung: debug builds only. */
+val EveryDirectRefusedKey = booleanPreferencesKey("everyDirectRefused")
+
+/**
+ * The developer options' "Pretend VISIONOS is blocked", every version: to see the chain as on the
+ * day VISIONOS stops. A test tool, shown and read in debug and preview builds only, whatever
+ * Unreleased.WEB_FALLBACK says: see VisionosTest.offered.
+ */
+val VisionosRefusedKey = booleanPreferencesKey("visionosTakenForRefused")
+
+/** The same for VISIONOS as this app says it alone, so that its other identities are heard taking over. */
+val OwnVisionosRefusedKey = booleanPreferencesKey("ownVisionosTakenForRefused")
+val DataSyncIdKey = stringPreferencesKey("dataSyncId")
+val InnerTubeCookieKey = stringPreferencesKey("innerTubeCookie")
+val AccountNameKey = stringPreferencesKey("accountName")
+val AccountEmailKey = stringPreferencesKey("accountEmail")
+val AccountChannelHandleKey = stringPreferencesKey("accountChannelHandle")
+
+/**
+ * Set once the account picker that Login opens by itself has been dismissed, or has come back
+ * without an account. Login then opens Google's page straight away, as it did before the picker,
+ * and the picker opens only from Pick one. Picking an account clears it. See LoginScreen.
+ */
+val LoginPickerDeclinedKey = booleanPreferencesKey("loginPickerDeclined")
+
+
+/**
+ * Misc
+ */
+val LastUpdateCheckKey = longPreferencesKey("lastUpdateCheck")
+val LastVersionKey = stringPreferencesKey("lastVersion")
+val UpdateAvailableKey = booleanPreferencesKey("updateAvailable")
+
+/** The rest of the last found release, so a restart does not forget it. See UpdateChecker. */
+val LastVersionCodeKey = intPreferencesKey("lastVersionCode")
+val LastReleaseUrlKey = stringPreferencesKey("lastReleaseUrl")
+val LastDownloadUrlKey = stringPreferencesKey("lastDownloadUrl")
+val LastAssetSizeKey = longPreferencesKey("lastAssetSize")
+val LastChangelogKey = stringPreferencesKey("lastChangelog")
+
+/** Download a found update ahead of time. Installing still asks. Off by default. */
+val AutoInstallUpdatesKey = booleanPreferencesKey("autoInstallUpdates")
+
+/** Epoch millis before which the update prompt stays quiet, set by "remind me later". */
+val UpdateSnoozeUntilKey = longPreferencesKey("updateSnoozeUntil")
+
+/** The version code the background check last notified about, so it says so once, not every run. */
+val LastNotifiedUpdateCodeKey = intPreferencesKey("lastNotifiedUpdateCode")
+
+/**
+ * Epoch millis of the tap on Open Auto Blocker that the install is to start again after: it starts
+ * when the person is next back in InterTune, within half an hour, and this is cleared as it does.
+ * Unset when nothing is owed. In the settings and not in memory, since the app can be ended while
+ * the person is in Settings. See AutoBlockerReturn.
+ */
+val AutoBlockerReturnAtKey = longPreferencesKey("autoBlockerReturnAt")
+
+/**
+ * The version code of the build that last saw Auto Blocker stop an install. The build that
+ * replaces it says once that Auto Blocker can go back on, and clears this as it does. Unset when
+ * there is nothing to say. See AutoBlockerReturn.
+ */
+val AutoBlockerBlockedByKey = intPreferencesKey("autoBlockerBlockedBy")
+
+/** The poll id the background check last notified about, for the same reason. */
+val LastNotifiedPollIdKey = stringPreferencesKey("lastNotifiedPollId")
+
+/**
+ * Whether to look for newer InterTune releases on GitHub.
+ *
+ * Off by default and opt in. A version check is a request to a third party that reveals roughly
+ * when the app is used, which is not something to switch on for somebody.
+ */
+val UpdateCheckEnabledKey = booleanPreferencesKey("updateCheckEnabled")
+
+/** versionCode the user dismissed. Anything newer than this is still worth raising. */
+val DismissedUpdateCodeKey = intPreferencesKey("dismissedUpdateCode")
+
+/**
+ * Whether InterTune may ask the occasional question and send the answer.
+ *
+ * Off by default and opt in, read through rememberNullablePreference so that "never asked" stays
+ * distinguishable from "said no". Nothing is fetched and nothing is sent until this is true, which
+ * is the whole basis on which the feature can honestly be described to people.
+ */
+/**
+ * How often, in hours, to look for updates and questions while the app is closed. 0 is off.
+ *
+ * Governs both because they are the same promise to the user: check quietly, tell me when there is
+ * something. Two separate schedules would mean two background wakes for one answer.
+ */
+val BackgroundCheckHoursKey = intPreferencesKey("backgroundCheckHours")
+
+val PollsEnabledKey = booleanPreferencesKey("pollsEnabled")
+
+/**
+ * Whether announcements are shown, separately from questions. Unset means never asked. Someone who
+ * had said yes to questions before announcements had their own switch has it set to yes once, the
+ * first time the checker runs, since the two used to be one switch.
+ */
+val AnnouncementsEnabledKey = booleanPreferencesKey("announcementsEnabled")
+
+/** Poll ids already answered. Never asked again, on any device that shares this datastore. */
+val AnsweredPollIdsKey = stringSetPreferencesKey("answeredPollIds")
+
+/** Poll ids waved away with the banner's close button. Not answered, but not to be raised again. */
+val DismissedPollIdsKey = stringSetPreferencesKey("dismissedPollIds")
+
+/**
+ * Announcements the user has closed.
+ *
+ * Separate from the poll set so that clearing one does not clear the other, and so an announcement
+ * id can never collide with a poll id in the same document.
+ */
+val DismissedAnnouncementIdsKey = stringSetPreferencesKey("dismissedAnnouncementIds")
+
+/** Whether the listen button starts a continuous listen rather than a single one. */
+val RecogniseKeepListeningKey = booleanPreferencesKey("recogniseKeepListening")
+
+/** Whether our own playback stops while listening, when it is coming out of the phone's speaker. */
+val RecognisePauseOnSpeakerKey = booleanPreferencesKey("recognisePauseOnSpeaker")
+
+/** Seconds of audio taken per identification attempt. MicrophoneListener.DEFAULT_SECONDS. */
+val RecogniseListenSecondsKey = intPreferencesKey("recogniseListenSeconds")
+
+/** Song on this phone's tile has said once why Android asks to record the screen (PhoneListenActivity). */
+val PhoneAudioExplainedKey = booleanPreferencesKey("phoneAudioExplained")
+
+/** Add confident matches to the playlist without being asked. Continuous runs only. */
+val RecogniseAutoAddKey = booleanPreferencesKey("recogniseAutoAdd")
+
+/** Hold the screen awake while listening. */
+val RecogniseKeepAwakeKey = booleanPreferencesKey("recogniseKeepAwake")
+
+/** Every song recognition has heard, as a JSON array. See RecognitionHistory. */
+val RecognitionHistoryKey = stringPreferencesKey("recognitionHistory")
+
+/**
+ * The build whose walkthrough has already been seen.
+ *
+ * Not the same as the last build that ran: this only moves when somebody reaches the end of a
+ * walkthrough or skips one, so an update that crashes on launch does not silently mark its own
+ * features as already explained.
+ */
+val WalkthroughSeenVersionKey = intPreferencesKey("walkthroughSeenVersion")
+
+/**
+ * The cards of the welcome back page looked at so far, one id a line. Kept until every new thing
+ * has been looked at or the card on Home is dismissed: held in memory alone, the ticks were gone
+ * whenever the page closed, and closing it sent the card away with things still unseen.
+ */
+val WelcomeLookedAtKey = stringPreferencesKey("welcomeLookedAt")
+
+/** Poll and announcement ids whose opening has been counted, so each is counted once per install. */
+val ViewedPollIdsKey = stringSetPreferencesKey("viewedPollIds")
+
+/** Epoch millis of the last poll fetch, for the rate limit floor. */
+val LastPollFetchKey = longPreferencesKey("lastPollFetch")
+
+/** The versionCode of the build that made the last fetch; any other build fetches afresh. */
+val PollFetchVersionKey = intPreferencesKey("pollFetchVersion")
+
+/**
+ * The last poll document, verbatim.
+ *
+ * Cached rather than parsed into separate keys because polls are a list and the interesting one
+ * depends on what has since been answered. Re-parsing the raw json on restore keeps one source of
+ * truth and means a restart inside the rate limit window still shows the right question.
+ */
+val CachedPollsJsonKey = stringPreferencesKey("cachedPollsJson")
+
+/** The names last read from README > Donors (Donors.kt), one per line, shown in About > Support InterTune. */
+val DonorsCacheKey = stringPreferencesKey("donorsCache")
+
+/**
+ * Consent to being counted once a day. Off until somebody says otherwise, like every other switch
+ * that sends anything anywhere.
+ */
+/**
+ * Whether playback may ask YouTube as the signed-in account. See [PlaybackAuthMode].
+ *
+ * Defaults to WHEN_REFUSED: costs nothing while everything works, and is the only thing that can
+ * play an age gated song for somebody whose account is allowed it.
+ */
+val PlaybackAuthModeKey = stringPreferencesKey("playbackAuthMode")
+
+/** Whether the unwatched end of the queue re-plans itself. See [AdaptiveQueueMode]. */
+val AdaptiveQueueModeKey = stringPreferencesKey("adaptiveQueueMode")
+
+/**
+ * Whether the audio chain runs in 32 bit float rather than 16 bit integer.
+ *
+ * Matters because of the gain stage. Loudness normalisation multiplies every sample, and doing
+ * that in 16 bit rounds the result back to 16 bit afterwards, which is avoidable quantisation on
+ * every single track. GainAudioProcessor was written to handle float and never received any,
+ * because the sink dropped the flag on the floor.
+ *
+ * Off by default. Float output cannot be offloaded, so on a device that would have offloaded this
+ * costs battery, and the difference is small enough that it should be a choice rather than a
+ * decision made for everybody.
+ */
+val HighPrecisionAudioKey = booleanPreferencesKey("highPrecisionAudio")
+
+/**
+ * What the audio chain does to the stereo it is given. See SpatialAudioMode.
+ *
+ * An effect, not fidelity, whichever way it is set. YouTube Music serves stereo only, so anything
+ * beyond two channels is invented rather than recovered.
+ */
+val SpatialAudioKey = stringPreferencesKey("spatialAudio")
+
+/**
+ * Whether the soundstage stays put when the listener turns their head.
+ *
+ * Only means anything alongside SpatialAudioMode.HEADPHONES, and only on a phone that publishes a
+ * head tracker at all, which most do not: the sensor is restricted to system uids and most vendors
+ * never load the sub-HAL that would create one. Off by default and hidden where nothing is
+ * available, rather than shown as a switch that does nothing.
+ */
+val HeadTrackingKey = booleanPreferencesKey("headTracking")
+
+/**
+ * How far apart the binaural renderer's two virtual loudspeakers stand, in degrees either side.
+ *
+ * Thirty is what a stereo mix is made for. Wider separates the instruments, because a first-order
+ * field is blurry enough that two speakers sixty degrees apart land inside one blur, and the cost
+ * is a hole in the middle. A tuning knob rather than a feature.
+ */
+val StageWidthKey = intPreferencesKey("stageWidth")
+
+/** How much of the spatial rendering is heard, in hundredths: 100 is all of it, as it was before there was a choice. */
+val SpatialStrengthKey = intPreferencesKey("spatialStrength")
+
+/** Whether the low notes go round the spatial rendering and stay as they were recorded. */
+val SpatialBassDirectKey = booleanPreferencesKey("spatialBassDirect")
+
+/** How much of a room the spatial rendering puts round its two speakers, in hundredths: 0 is none, as before. */
+val SpatialRoomKey = intPreferencesKey("spatialRoom")
+
+/** How far out the spatial rendering moves the air round a recording, in hundredths of the way to the sides: 0 is not at all, as before. */
+val SpatialAmbienceKey = intPreferencesKey("spatialAmbience")
+
+/** How hard the renderer guesses ahead of the head. See HeadTrackingResponse. */
+val HeadTrackingResponseKey = stringPreferencesKey("headTrackingResponse")
+
+/**
+ * Written with the current time to ask for a drift calibration. See HeadTracking.
+ *
+ * A request rather than a value, because the work happens in the service and the button is in the
+ * settings, and this is the channel those two already share.
+ */
+val HeadTrackingCalibrateKey = longPreferencesKey("headTrackingCalibrate")
+
+/** Measured drift of the head tracker, in degrees per second. Zero until calibrated. */
+val HeadTrackingDriftKey = floatPreferencesKey("headTrackingDrift")
+
+/**
+ * How far ahead of the head to aim, in milliseconds.
+ *
+ * Should be the real delay between rendering a sample and hearing it, which is mostly whichever
+ * Bluetooth codec got negotiated and is not a number an app can find out: the platform reports no
+ * latency modes for this route. So it is tuned by ear, once, against the hardware in use.
+ */
+val HeadTrackingLeadKey = intPreferencesKey("headTrackingLead")
+
+/**
+ * Whether tilting the head counts, not only turning it.
+ *
+ * Costs six more harmonics to convolve, which is a little over half again, and buys the weakest
+ * cue a borrowed pair of ears can offer. Worth having as a choice.
+ */
+val HeadTracking3dKey = booleanPreferencesKey("headTracking3d")
+
+/**
+ * Whether walking away from the phone turns the music down.
+ *
+ * Signal strength is a usable distance measure here, which was worth checking rather than
+ * assuming: near and far separate by about thirty decibels, and the body shadowing that makes
+ * individual readings jump around is symmetric enough that a median deletes it. See
+ * ProximityVolume.
+ */
+val ProximityVolumeKey = booleanPreferencesKey("proximityVolume")
+
+val UsageCountEnabledKey = booleanPreferencesKey("usageCountEnabled")
+
+/**
+ * The random name this device is counted under this month, and the month it belongs to.
+ *
+ * Held rather than derived so that the device keeps no long lived secret either: when the month
+ * turns the old value is overwritten, not hashed forward, so nothing on the device links this
+ * month to the last one.
+ */
+val UsageCountIdKey = stringPreferencesKey("usageCountId")
+val UsageCountPeriodKey = stringPreferencesKey("usageCountPeriod")
+
+/** The last local day counted, which is what keeps this to once a day however often the app opens. */
+val UsageCountLastDayKey = stringPreferencesKey("usageCountLastDay")
+
+/** The receivers cast to before, the latest first, as cast/RecentReceivers writes them. */
+val CastRecentKey = stringPreferencesKey("castRecent")
+
+val LanguageCodeToName = mapOf(
+    "af" to "Afrikaans",
+    "az" to "Azərbaycan",
+    "id" to "Bahasa Indonesia",
+    "ms" to "Bahasa Malaysia",
+    "ca" to "Català",
+    "cs" to "Čeština",
+    "da" to "Dansk",
+    "de" to "Deutsch",
+    "et" to "Eesti",
+    "en-GB" to "English (UK)",
+    "en" to "English (US)",
+    "es" to "Español (España)",
+    "es-419" to "Español (Latinoamérica)",
+    "eu" to "Euskara",
+    "fil" to "Filipino",
+    "fr" to "Français",
+    "fr-CA" to "Français (Canada)",
+    "gl" to "Galego",
+    "hr" to "Hrvatski",
+    "zu" to "IsiZulu",
+    "is" to "Íslenska",
+    "it" to "Italiano",
+    "sw" to "Kiswahili",
+    "lt" to "Lietuvių",
+    "hu" to "Magyar",
+    "nl" to "Nederlands",
+    "no" to "Norsk",
+    "or" to "Odia",
+    "uz" to "O‘zbe",
+    "pl" to "Polski",
+    "pt-PT" to "Português",
+    "pt" to "Português (Brasil)",
+    "ro" to "Română",
+    "sq" to "Shqip",
+    "sk" to "Slovenčina",
+    "sl" to "Slovenščina",
+    "fi" to "Suomi",
+    "sv" to "Svenska",
+    "bo" to "Tibetan བོད་སྐད།",
+    "vi" to "Tiếng Việt",
+    "tr" to "Türkçe",
+    "bg" to "Български",
+    "ky" to "Кыргызча",
+    "kk" to "Қазақ Тілі",
+    "mk" to "Македонски",
+    "mn" to "Монгол",
+    "ru" to "Русский",
+    "sr" to "Српски",
+    "uk" to "Українська",
+    "el" to "Ελληνικά",
+    "hy" to "Հայերեն",
+    "iw" to "עברית",
+    "ur" to "اردو",
+    "ar" to "العربية",
+    "fa" to "فارسی",
+    "ne" to "नेपाली",
+    "mr" to "मराठी",
+    "hi" to "हिन्दी",
+    "bn" to "বাংলা",
+    "pa" to "ਪੰਜਾਬੀ",
+    "gu" to "ગુજરાતી",
+    "ta" to "தமிழ்",
+    "te" to "తెలుగు",
+    "kn" to "ಕನ್ನಡ",
+    "ml" to "മലയാളം",
+    "si" to "සිංහල",
+    "th" to "ภาษาไทย",
+    "lo" to "ລາວ",
+    "my" to "ဗမာ",
+    "ka" to "ქართული",
+    "am" to "አማርኛ",
+    "km" to "ខ្មែរ",
+    "zh-CN" to "中文 (简体)",
+    "zh-TW" to "中文 (繁體)",
+    "zh-HK" to "中文 (香港)",
+    "ja" to "日本語",
+    "ko" to "한국어",
+)
+
+val CountryCodeToName = mapOf(
+    "DZ" to "Algeria",
+    "AR" to "Argentina",
+    "AU" to "Australia",
+    "AT" to "Austria",
+    "AZ" to "Azerbaijan",
+    "BH" to "Bahrain",
+    "BD" to "Bangladesh",
+    "BY" to "Belarus",
+    "BE" to "Belgium",
+    "BO" to "Bolivia",
+    "BA" to "Bosnia and Herzegovina",
+    "BR" to "Brazil",
+    "BG" to "Bulgaria",
+    "KH" to "Cambodia",
+    "CA" to "Canada",
+    "CL" to "Chile",
+    "HK" to "Hong Kong",
+    "CO" to "Colombia",
+    "CR" to "Costa Rica",
+    "HR" to "Croatia",
+    "CY" to "Cyprus",
+    "CZ" to "Czech Republic",
+    "DK" to "Denmark",
+    "DO" to "Dominican Republic",
+    "EC" to "Ecuador",
+    "EG" to "Egypt",
+    "SV" to "El Salvador",
+    "EE" to "Estonia",
+    "FI" to "Finland",
+    "FR" to "France",
+    "GE" to "Georgia",
+    "DE" to "Germany",
+    "GH" to "Ghana",
+    "GR" to "Greece",
+    "GT" to "Guatemala",
+    "HN" to "Honduras",
+    "HU" to "Hungary",
+    "IS" to "Iceland",
+    "IN" to "India",
+    "ID" to "Indonesia",
+    "IQ" to "Iraq",
+    "IE" to "Ireland",
+    "IL" to "Israel",
+    "IT" to "Italy",
+    "JM" to "Jamaica",
+    "JP" to "Japan",
+    "JO" to "Jordan",
+    "KZ" to "Kazakhstan",
+    "KE" to "Kenya",
+    "KR" to "South Korea",
+    "KW" to "Kuwait",
+    "LA" to "Lao",
+    "LV" to "Latvia",
+    "LB" to "Lebanon",
+    "LY" to "Libya",
+    "LI" to "Liechtenstein",
+    "LT" to "Lithuania",
+    "LU" to "Luxembourg",
+    "MK" to "Macedonia",
+    "MY" to "Malaysia",
+    "MT" to "Malta",
+    "MX" to "Mexico",
+    "ME" to "Montenegro",
+    "MA" to "Morocco",
+    "NP" to "Nepal",
+    "NL" to "Netherlands",
+    "NZ" to "New Zealand",
+    "NI" to "Nicaragua",
+    "NG" to "Nigeria",
+    "NO" to "Norway",
+    "OM" to "Oman",
+    "PK" to "Pakistan",
+    "PA" to "Panama",
+    "PG" to "Papua New Guinea",
+    "PY" to "Paraguay",
+    "PE" to "Peru",
+    "PH" to "Philippines",
+    "PL" to "Poland",
+    "PT" to "Portugal",
+    "PR" to "Puerto Rico",
+    "QA" to "Qatar",
+    "RO" to "Romania",
+    "RU" to "Russian Federation",
+    "SA" to "Saudi Arabia",
+    "SN" to "Senegal",
+    "RS" to "Serbia",
+    "SG" to "Singapore",
+    "SK" to "Slovakia",
+    "SI" to "Slovenia",
+    "ZA" to "South Africa",
+    "ES" to "Spain",
+    "LK" to "Sri Lanka",
+    "SE" to "Sweden",
+    "CH" to "Switzerland",
+    "TW" to "Taiwan",
+    "TZ" to "Tanzania",
+    "TH" to "Thailand",
+    "TN" to "Tunisia",
+    "TR" to "Turkey",
+    "UG" to "Uganda",
+    "UA" to "Ukraine",
+    "AE" to "United Arab Emirates",
+    "GB" to "United Kingdom",
+    "US" to "United States",
+    "UY" to "Uruguay",
+    "VE" to "Venezuela (Bolivarian Republic)",
+    "VN" to "Vietnam",
+    "YE" to "Yemen",
+    "ZW" to "Zimbabwe",
+)

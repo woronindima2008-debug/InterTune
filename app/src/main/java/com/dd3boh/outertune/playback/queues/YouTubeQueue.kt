@@ -1,0 +1,64 @@
+package com.dd3boh.outertune.playback.queues
+
+import com.dd3boh.outertune.models.ContentFilter
+import com.dd3boh.outertune.models.MediaMetadata
+import com.dd3boh.outertune.models.toMediaMetadata
+import com.dd3boh.outertune.utils.YouTubeTrouble
+import com.zionhuang.innertube.YouTube
+import com.zionhuang.innertube.models.WatchEndpoint
+import kotlinx.coroutines.Dispatchers.IO
+import kotlinx.coroutines.withContext
+
+class YouTubeQueue(
+    private var endpoint: WatchEndpoint,
+    override val preloadItem: MediaMetadata? = null,
+    override val playlistId: String? = endpoint.playlistId,
+    override val startShuffled: Boolean = false,
+    private var continuation: String? = null,
+) : Queue {
+
+    override suspend fun getInitialStatus(): Queue.Status {
+        val nextResult = withContext(IO) {
+            // Asked as the account whenever there is one, so an answer says the sign-in still
+            // works (YouTubeTrouble); a failure is told by MusicService, which says why.
+            YouTube.next(endpoint, continuation)
+                .onSuccess { YouTubeTrouble.answered(asAccount = true) }
+                .getOrThrow()
+        }
+        endpoint = nextResult.endpoint
+        continuation = nextResult.continuation
+        // The song it was started from stays even when it is one the switches hide: it was chosen.
+        val (items, start) = ContentFilter.current.radio(nextResult.items, nextResult.currentIndex ?: 0)
+        return Queue.Status(
+            title = nextResult.title,
+            items = items.map { it.toMediaMetadata() },
+            mediaItemIndex = start,
+            relatedEndpoint = nextResult.relatedEndpoint,
+        )
+    }
+
+    override fun hasNextPage(): Boolean = continuation != null
+
+    override suspend fun nextPage(): List<MediaMetadata> {
+        val nextResult = withContext(IO) {
+            YouTube.next(endpoint, continuation).getOrNull()
+        }
+        if (nextResult != null) {
+            endpoint = nextResult.endpoint
+        }
+        continuation = nextResult?.continuation
+        return nextResult?.items?.let(ContentFilter.current::apply)?.map { it.toMediaMetadata() } ?: emptyList()
+    }
+
+//    fun getContinuationEndpoint(): String? {
+//        return if (endpoint.videoId != null && continuation != null) {
+//            "${endpoint.videoId}\n$continuation"
+//        } else {
+//            null
+//        }
+//    }
+
+    companion object {
+        fun radio(song: MediaMetadata) = YouTubeQueue(WatchEndpoint(song.id), song)
+    }
+}

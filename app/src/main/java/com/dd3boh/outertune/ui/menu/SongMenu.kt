@@ -1,0 +1,441 @@
+package com.dd3boh.outertune.ui.menu
+
+import androidx.compose.material.icons.rounded.PersonOff
+import androidx.compose.material.icons.rounded.Snooze
+import androidx.compose.material.icons.rounded.Block
+import com.dd3boh.outertune.constants.SignalKind
+import com.dd3boh.outertune.constants.Unreleased
+import com.dd3boh.outertune.utils.ActivityLog
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.asPaddingValues
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.systemBars
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.rounded.PlaylistAdd
+import androidx.compose.material.icons.automirrored.rounded.PlaylistPlay
+import androidx.compose.material.icons.automirrored.rounded.QueueMusic
+import androidx.compose.material.icons.rounded.Album
+import androidx.compose.material.icons.rounded.Delete
+import androidx.compose.material.icons.rounded.Edit
+import androidx.compose.material.icons.rounded.Info
+import androidx.compose.material.icons.rounded.LibraryAdd
+import androidx.compose.material.icons.rounded.LibraryAddCheck
+import androidx.compose.material.icons.rounded.PlayArrow
+import androidx.compose.material.icons.rounded.PlaylistRemove
+import androidx.compose.material.icons.rounded.Radio
+import androidx.compose.material.icons.rounded.Share
+import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.Icon
+import androidx.compose.material3.LocalContentColor
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.platform.LocalClipboard
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.TextRange
+import androidx.compose.ui.text.input.TextFieldValue
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.util.fastSumBy
+import androidx.media3.exoplayer.offline.Download.STATE_COMPLETED
+import androidx.navigation.NavController
+import coil3.compose.AsyncImage
+import com.dd3boh.outertune.LocalDatabase
+import com.dd3boh.outertune.constants.PlayOrigin
+import com.dd3boh.outertune.LocalDownloadUtil
+import com.dd3boh.outertune.LocalPlayerConnection
+import com.dd3boh.outertune.R
+import com.dd3boh.outertune.constants.ListThumbnailSize
+import com.dd3boh.outertune.constants.SyncMode
+import com.dd3boh.outertune.constants.ThumbnailCornerRadius
+import com.dd3boh.outertune.constants.YtmSyncModeKey
+import com.dd3boh.outertune.db.entities.Event
+import com.dd3boh.outertune.db.entities.Playlist
+import com.dd3boh.outertune.db.entities.PlaylistSong
+import com.dd3boh.outertune.db.entities.Song
+import com.dd3boh.outertune.extensions.toMediaItem
+import com.dd3boh.outertune.models.toMediaMetadata
+import com.dd3boh.outertune.playback.queues.ListQueue
+import com.dd3boh.outertune.playback.queues.YouTubeQueue
+import com.dd3boh.outertune.ui.component.button.IconButton
+import com.dd3boh.outertune.ui.component.items.ListItem
+import com.dd3boh.outertune.ui.dialog.AddToPlaylistDialog
+import com.dd3boh.outertune.ui.dialog.AddToQueueDialog
+import com.dd3boh.outertune.ui.dialog.ArtistDialog
+import com.dd3boh.outertune.ui.dialog.DetailsDialog
+import com.dd3boh.outertune.ui.dialog.TextFieldDialog
+import com.dd3boh.outertune.utils.ShareLinks
+import com.dd3boh.outertune.utils.removeFromYouTubePlaylist
+import com.dd3boh.outertune.utils.joinByBullet
+import com.dd3boh.outertune.utils.makeTimeString
+import com.dd3boh.outertune.utils.rememberEnumPreference
+import com.dd3boh.outertune.utils.syncCoroutine
+import com.zionhuang.innertube.YouTube
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.launch
+import kotlin.math.roundToInt
+
+@Composable
+fun SongMenu(
+    originalSong: Song,
+    playlistSong: PlaylistSong? = null,
+    playlist: Playlist? = null,
+    event: Event? = null,
+    navController: NavController,
+    onDismiss: () -> Unit,
+    /** Present on a recommendation card: (kind 1 song 2 artist, reason 1 ban 2 snooze). */
+    onExclude: ((kind: Int, reason: Int) -> Unit)? = null,
+) {
+    val context = LocalContext.current
+    val shareLink = rememberShareLink()
+    val database = LocalDatabase.current
+    val density = LocalDensity.current
+    val downloadUtil = LocalDownloadUtil.current
+    val clipboardManager = LocalClipboard.current
+    val playerConnection = LocalPlayerConnection.current ?: return
+
+    val syncMode by rememberEnumPreference(key = YtmSyncModeKey, defaultValue = SyncMode.RW)
+
+    /**
+     * Observe the row rather than trusting the snapshot the sheet was opened with. MenuState.show
+     * stores the content lambda once, so this parameter can never change while the sheet is up and
+     * nothing here recomposed when the heart button wrote to Room.
+     *
+     * That is upstream #1171, and it is worse than "the icon does not update": SongEntity.toggleLike
+     * derives the new value from its receiver, so with a frozen receiver every tap writes
+     * liked = true again and un-liking from this sheet is impossible. The Add/Remove-from-library
+     * item and the edit dialog's prefilled title read the same value and were stale for the same
+     * reason.
+     *
+     * This read was removed in 63de271d while deleting auto-download-on-like; only the effect was
+     * meant to go. YouTubeSongMenu still observes correctly, which is why its heart works.
+     */
+    val songState = remember(originalSong.id) { database.song(originalSong.id) }.collectAsState(initial = originalSong)
+    val song = songState.value ?: originalSong
+    val download by LocalDownloadUtil.current.getDownload(originalSong.id).collectAsState(initial = null)
+    val coroutineScope =
+        CoroutineScope(syncCoroutine) // rememberCoroutineScope has exception "rememberCoroutineScope left the composition"
+
+    val currentFormatState = remember(originalSong.id) { database.format(originalSong.id) }.collectAsState(initial = null)
+    val currentFormat = currentFormatState.value
+
+    var showEditDialog by rememberSaveable {
+        mutableStateOf(false)
+    }
+    var showChooseQueueDialog by rememberSaveable {
+        mutableStateOf(false)
+    }
+    var showChoosePlaylistDialog by rememberSaveable {
+        mutableStateOf(false)
+    }
+    var showSelectArtistDialog by rememberSaveable {
+        mutableStateOf(false)
+    }
+    var showDetailsDialog by rememberSaveable {
+        mutableStateOf(false)
+    }
+    var showBlockArtist by rememberSaveable { mutableStateOf(false) }
+    val blockable = remember(song.artists) { blockChoices(song.artists) }
+
+    ListItem(
+        title = song.song.title,
+        subtitle = joinByBullet(
+            song.artists.joinToString { it.name },
+            makeTimeString(song.song.duration * 1000L)
+        ),
+        thumbnailContent = {
+            val px = (ListThumbnailSize.value * density.density).roundToInt()
+            AsyncImage(
+                model = song.song.getThumbnailModel(px, px),
+                contentDescription = null,
+                modifier = Modifier
+                    .size(ListThumbnailSize)
+                    .clip(RoundedCornerShape(ThumbnailCornerRadius))
+            )
+        },
+        trailingContent = {
+            IconButton(
+                onClick = {
+                    // toggleLike sends the like to YouTube itself. A likeSong here sent it again.
+                    val s = song.song.toggleLike()
+                    database.query {
+                        update(s)
+                    }
+                    downloadUtil.autoDownloadOnLike(s)
+                }
+            ) {
+                Icon(
+                    painter = painterResource(if (song.song.liked) R.drawable.favorite else R.drawable.favorite_border),
+                    tint = if (song.song.liked) MaterialTheme.colorScheme.error else LocalContentColor.current,
+                    contentDescription = null
+                )
+            }
+        }
+    )
+
+    HorizontalDivider()
+
+    GridMenu(
+        contentPadding = PaddingValues(
+            start = 8.dp,
+            top = 8.dp,
+            end = 8.dp,
+            bottom = 8.dp + WindowInsets.systemBars.asPaddingValues().calculateBottomPadding()
+        )
+    ) {
+        if (!song.song.isLocal)
+            GridMenuItem(
+                icon = Icons.Rounded.Radio,
+                title = R.string.start_radio
+            ) {
+                onDismiss()
+                playerConnection.playQueue(YouTubeQueue.radio(song.toMediaMetadata()), isRadio = true)
+            }
+
+        GridMenuItem(
+            icon = Icons.Rounded.PlayArrow,
+            title = R.string.play
+        ) {
+            playerConnection.playQueue(
+                queue = ListQueue(
+                    title = song.title,
+                    items = listOf(song.toMediaMetadata())
+                ),
+                origin = PlayOrigin.MENU,
+            )
+            onDismiss()
+        }
+        GridMenuItem(
+            icon = Icons.AutoMirrored.Rounded.PlaylistPlay,
+            title = R.string.play_next
+        ) {
+            onDismiss()
+            playerConnection.enqueueNext(song.toMediaItem())
+        }
+        GridMenuItem(
+            icon = Icons.Rounded.Edit,
+            title = R.string.edit
+        ) {
+            showEditDialog = true
+        }
+        GridMenuItem(
+            icon = Icons.AutoMirrored.Rounded.QueueMusic,
+            title = R.string.add_to_queue
+        ) {
+            showChooseQueueDialog = true
+        }
+        if (onExclude != null) {
+            GridMenuItem(icon = Icons.Rounded.Block, title = R.string.menu_not_this_song) { onExclude(1, 1); onDismiss() }
+            GridMenuItem(icon = Icons.Rounded.Snooze, title = R.string.menu_less_of_artist) { onExclude(2, 2); onDismiss() }
+            GridMenuItem(icon = Icons.Rounded.PersonOff, title = R.string.menu_never_artist) { onExclude(2, 1); onDismiss() }
+        }
+        GridMenuItem(
+            icon = Icons.AutoMirrored.Rounded.PlaylistAdd,
+            title = R.string.add_to_playlist
+        ) {
+            showChoosePlaylistDialog = true
+        }
+
+        if (playlistSong != null && (playlist?.playlist?.isLocal == true
+                    || (playlistSong.song.song.isLocal || syncMode == SyncMode.RW))
+        ) {
+            GridMenuItem(
+                icon = Icons.Rounded.PlaylistRemove,
+                title = R.string.remove_from_playlist
+            ) {
+                database.transaction {
+                    // Where the row is now, found by its id, rather than the position it was drawn
+                    // with, which can be out of date. A playlist search went on showing rows drawn
+                    // before an earlier removal closed up the positions behind it, and moving by
+                    // one of those sent a song the search was not even showing to the bottom and
+                    // left a gap. A row that has already gone is left alone rather than moving
+                    // whatever took its place. Saved twice takes its copies out the same way.
+                    removeFromPlaylist(playlistSong.map.id)
+                }
+
+                coroutineScope.launch {
+                    removeFromYouTubePlaylist(playlist?.playlist?.browseId, playlistSong.map)
+                }
+
+                onDismiss()
+            }
+        }
+
+        if (!song.song.isLocal)
+            DownloadGridMenu(
+                localDateTime = download,
+                onDownload = {
+                    ActivityLog.note(context, database, song.id, SignalKind.DOWNLOAD)
+                    downloadUtil.download(song.toMediaMetadata())
+                },
+                onRemoveDownload = { downloadUtil.removeDownload(song.id) }
+            )
+
+
+        GridMenuItem(
+            icon = R.drawable.artist,
+            title = R.string.view_artist
+        ) {
+            if (song.artists.size == 1) {
+                ActivityLog.note(context, database, song.id, SignalKind.ARTIST_PAGE)
+                navController.navigate("artist/${song.artists[0].id}")
+                onDismiss()
+            } else {
+                showSelectArtistDialog = true
+            }
+        }
+        if (song.song.albumId != null && !song.song.isLocal) {
+            GridMenuItem(
+                icon = Icons.Rounded.Album,
+                title = R.string.view_album
+            ) {
+                onDismiss()
+                navController.navigate("album/${song.song.albumId}")
+            }
+        }
+        if (!song.song.isLocal)
+            GridMenuItem(
+                icon = Icons.Rounded.Share,
+                title = R.string.share
+            ) {
+                ActivityLog.note(context, database, song.id, SignalKind.SHARE)
+                shareLink(ShareLinks.song(song.id, song.song.title, song.artists.map { it.name }, song.song.duration, song.song.albumId != null), onDismiss)
+            }
+        GridMenuItem(
+            icon = Icons.Rounded.Info,
+            title = R.string.details
+        ) {
+            showDetailsDialog = true
+        }
+        if (!song.song.isLocal) {
+            if (song.song.inLibrary == null) {
+                GridMenuItem(
+                    icon = Icons.Rounded.LibraryAdd,
+                    title = R.string.add_to_library
+                ) {
+                    database.query {
+                        update(song.song.toggleLibrary())
+                    }
+                }
+            } else {
+                GridMenuItem(
+                    icon = Icons.Rounded.LibraryAddCheck,
+                    title = R.string.remove_from_library
+                ) {
+                    database.query {
+                        update(song.song.toggleLibrary())
+                    }
+                }
+            }
+        }
+        if (event != null) {
+            GridMenuItem(
+                icon = Icons.Rounded.Delete,
+                title = R.string.remove_from_history
+            ) {
+                onDismiss()
+                database.query {
+                    delete(event)
+                }
+            }
+        }
+        // Last, so that nothing anyone knows the place of moves.
+        if (Unreleased.ARTIST_BLOCK && blockable.isNotEmpty()) {
+            GridMenuItem(icon = BlockArtistIcon, title = R.string.menu_block_artist) { showBlockArtist = true }
+        }
+    }
+
+    /**
+     * ---------------------------
+     * Dialogs
+     * ---------------------------
+     */
+
+    if (showEditDialog) {
+        TextFieldDialog(
+            icon = { Icon(imageVector = Icons.Rounded.Edit, contentDescription = null) },
+            title = { Text(text = stringResource(R.string.edit_song)) },
+            onDismiss = { showEditDialog = false },
+            initialTextFieldValue = TextFieldValue(song.song.title, TextRange(song.song.title.length)),
+            onDone = { title ->
+                onDismiss()
+                database.query {
+                    update(song.song.copy(title = title))
+                }
+            }
+        )
+    }
+
+    if (showChooseQueueDialog) {
+        AddToQueueDialog(
+            onAdd = { queueName ->
+                val q = playerConnection.service.queueBoard.addQueue(
+                    queueName, listOf(song.toMediaMetadata()),
+                    forceInsert = true, delta = false, origin = PlayOrigin.QUEUE
+                )
+                q?.let {
+                    playerConnection.service.queueBoard.setCurrQueue(it)
+                }
+            },
+            onDismiss = {
+                showChooseQueueDialog = false
+            }
+        )
+    }
+
+    if (showChoosePlaylistDialog) {
+        AddToPlaylistDialog(
+            navController = navController,
+            songIds = listOf(song.id),
+            onPreAdd = { playlist ->
+                ActivityLog.note(context, database, song.id, SignalKind.ADD_TO_PLAYLIST)
+                playlist.playlist.browseId?.let { browseId ->
+                    YouTube.addToPlaylist(browseId, song.id)
+                }
+                listOf(song.id)
+            },
+            onDismiss = { showChoosePlaylistDialog = false }
+        )
+    }
+
+    if (showSelectArtistDialog) {
+        ArtistDialog(
+            navController = navController,
+            artists = song.artists,
+            onDismiss = { showSelectArtistDialog = false }
+        )
+    }
+
+    if (showBlockArtist) {
+        BlockArtistFlow(
+            artists = blockable,
+            onClose = { showBlockArtist = false },
+            onBlocked = {
+                showBlockArtist = false
+                onDismiss()
+            },
+        )
+    }
+
+    if (showDetailsDialog) {
+        DetailsDialog(
+            mediaMetadata = song.toMediaMetadata(),
+            currentFormat = currentFormat,
+            currentPlayCount = song.playCount?.fastSumBy { it.count } ?: 0,
+            clipboardManager = clipboardManager,
+            setVisibility = { showDetailsDialog = it }
+        )
+    }
+}

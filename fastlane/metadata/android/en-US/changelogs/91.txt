@@ -1,0 +1,11 @@
+Version 0.11
+
+- Quick picks that learn how you listen: Best recommendations, with mood chips, a Discover row and a choice of what it leans toward.
+- What's playing? names the song around you, using Shazam.
+- A home screen widget.
+- Spatial audio, with head tracking on supported headphones.
+- History by day, with the time of each play.
+- Keypad phones and small screens.
+- Fixes to sync, downloads, playlists and backups.
+
+Full changelog: https://github.com/ItzSkyeYT/InterTune/releases/tag/v0.11

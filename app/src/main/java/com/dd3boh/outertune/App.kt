@@ -1,0 +1,357 @@
+/*
+ * Copyright (C) 2024 z-huang/InnerTune
+ * Copyright (C) 2025 OuterTune Project
+ *
+ * SPDX-License-Identifier: GPL-3.0
+ *
+ * For any other attributions, refer to the git commit history
+ */
+
+package com.dd3boh.outertune
+
+import com.dd3boh.outertune.utils.ProxyAddress
+import com.dd3boh.outertune.utils.ProxyAtStart
+import com.dd3boh.outertune.models.ContentFilter
+import com.dd3boh.outertune.utils.BuiltInKeys
+import android.webkit.CookieManager
+import android.os.Looper
+import android.os.Handler
+import android.app.Application
+import android.content.Context
+import android.util.Log
+import android.widget.Toast
+import android.widget.Toast.LENGTH_SHORT
+import androidx.datastore.preferences.core.edit
+import coil3.ImageLoader
+import coil3.PlatformContext
+import coil3.SingletonImageLoader
+import coil3.disk.DiskCache
+import com.dd3boh.outertune.utils.DownloadCovers
+import coil3.disk.directory
+import coil3.memory.MemoryCache
+import coil3.request.CachePolicy
+import coil3.request.allowHardware
+import coil3.request.transitionFactory
+import com.dd3boh.outertune.constants.AccountChannelHandleKey
+import com.dd3boh.outertune.constants.AccountEmailKey
+import com.dd3boh.outertune.constants.AccountNameKey
+import com.dd3boh.outertune.constants.ContentCountryKey
+import com.dd3boh.outertune.constants.ContentLanguageKey
+import com.dd3boh.outertune.constants.CountryCodeToName
+import com.dd3boh.outertune.constants.DataSyncIdKey
+import com.dd3boh.outertune.constants.InnerTubeCookieKey
+import com.dd3boh.outertune.constants.LanguageCodeToName
+import com.dd3boh.outertune.constants.LastAlbumSyncKey
+import com.dd3boh.outertune.constants.LastArtistSyncKey
+import com.dd3boh.outertune.constants.LastFullSyncKey
+import com.dd3boh.outertune.constants.LastLibSongSyncKey
+import com.dd3boh.outertune.constants.LastLikeSongSyncKey
+import com.dd3boh.outertune.constants.LastPlaylistSyncKey
+import com.dd3boh.outertune.constants.LastRecentActivitySyncKey
+import com.dd3boh.outertune.constants.MaxImageCacheSizeKey
+import com.dd3boh.outertune.constants.ProxyEnabledKey
+import com.dd3boh.outertune.constants.ProxyTypeKey
+import com.dd3boh.outertune.constants.ProxyUrlKey
+import com.dd3boh.outertune.constants.SYSTEM_DEFAULT
+import com.dd3boh.outertune.constants.StandInsKey
+import com.dd3boh.outertune.constants.StreamOrderKey
+import com.dd3boh.outertune.constants.UseLoginForBrowse
+import com.dd3boh.outertune.constants.VisitorDataKey
+import com.dd3boh.outertune.extensions.toEnum
+import com.dd3boh.outertune.playback.PhoneBatterySaver
+import com.dd3boh.outertune.playback.PlayerLogger
+import com.dd3boh.outertune.playback.ProximityProbe
+import com.dd3boh.outertune.playback.StandInMemory
+import com.dd3boh.outertune.ui.utils.CoverFade
+import com.dd3boh.outertune.utils.CoilBitmapLoader
+import com.dd3boh.outertune.utils.CrashLog
+import com.dd3boh.outertune.constants.Unreleased
+import com.dd3boh.outertune.utils.ReportFeed
+import com.dd3boh.outertune.utils.RunLogs
+import com.dd3boh.outertune.utils.LocalArtworkPathKeyer
+import com.dd3boh.outertune.utils.dataStore
+import com.dd3boh.outertune.utils.get
+import com.dd3boh.outertune.utils.mayPushToYouTube
+import com.dd3boh.outertune.utils.reportException
+import com.dd3boh.outertune.utils.YouTubeRegion
+import com.dd3boh.outertune.utils.YouTubeTrouble
+import com.dd3boh.outertune.utils.StreamOrder
+import com.dd3boh.outertune.utils.RemoteRoutes
+import com.dd3boh.outertune.constants.CachedPollsJsonKey
+import com.dd3boh.outertune.constants.LastPollFetchKey
+import com.dd3boh.outertune.utils.YTPlayerUtils
+import com.zionhuang.innertube.YouTube
+import com.zionhuang.innertube.models.YouTubeLocale
+import com.zionhuang.kugou.KuGou
+import dagger.hilt.android.HiltAndroidApp
+import kotlinx.coroutines.DelicateCoroutinesApi
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.GlobalScope
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.withContext
+import java.net.Proxy
+import java.util.Locale
+import com.dd3boh.outertune.utils.Toaster
+
+@HiltAndroidApp
+class App : Application(), SingletonImageLoader.Factory {
+    private val TAG = App::class.simpleName.toString()
+
+    @OptIn(DelicateCoroutinesApi::class)
+    override fun onCreate() {
+        super.onCreate()
+        // First, so a crash anywhere below is kept for the next launch to offer. See CrashLog.
+        CrashLog.install(this)
+        // Before there is a player: what Media3 logs for itself names the phone's address too.
+        PlayerLogger.install()
+        // This run's own lines, kept for Report a problem after the phone's log has moved on. See RunLogs.
+        if (Unreleased.PREVIOUS_LOGS) GlobalScope.launch(Dispatchers.IO) { RunLogs.start(this@App) }
+        // What Report a problem tells of the last few minutes: the app in front or not, the settings changed.
+        ReportFeed.start(this)
+        // Before anything can read a built-in key: until it has run they all read as empty.
+        BuiltInKeys.verify(this)
+        // Before anything reads Battery use: the phone's battery saver can turn Saver on (PhoneBatterySaver).
+        PhoneBatterySaver.start(this)
+
+        if (BuildConfig.DEBUG) {
+            System.setProperty("kotlinx.coroutines.debug", "on")
+        }
+
+        // 0.11 and 0.11.1 showed a test row that wrote the Bluetooth devices nearby to files in
+        // this folder, which Android backs up. Nothing ever read them, so they go.
+        GlobalScope.launch(Dispatchers.IO) { ProximityProbe.forgetOldLogs(getExternalFilesDir(null)) }
+
+        instance = this;
+        // Every request that changes the account asks this first, so "Read only" and signed out
+        // hold even where a call site forgot to check.
+        YouTube.accountWritesAllowed = { mayPushToYouTube() }
+        // YouTube's player script is kept here between launches, so the first song of a new
+        // process does not wait for it to be fetched again: see NewPipe.kt.
+        YouTube.newPipeCacheDir = cacheDir.resolve("newpipe-http")
+
+        val locale = Locale.getDefault()
+        val languageTag = locale.toLanguageTag().replace("-Hant", "") // replace zh-Hant-* to zh-*
+        YouTube.locale = YouTubeLocale(
+            gl = dataStore[ContentCountryKey]?.takeIf { it != SYSTEM_DEFAULT }
+                ?: locale.country.takeIf { it in CountryCodeToName }
+                ?: "US",
+            hl = dataStore[ContentLanguageKey]?.takeIf { it != SYSTEM_DEFAULT }
+                ?: locale.language.takeIf { it in LanguageCodeToName }
+                ?: languageTag.takeIf { it in LanguageCodeToName }
+                ?: "en"
+        )
+        if (languageTag == "zh-TW") {
+            KuGou.useTraditionalChinese = true
+        }
+
+        // The proxy every client takes once, here: the settings page offers a restart while the one
+        // set there differs (#68). See ProxyAtStart.
+        ProxyAtStart.setting = ProxyAtStart.of(dataStore[ProxyEnabledKey], dataStore[ProxyTypeKey], dataStore[ProxyUrlKey])
+        if (dataStore[ProxyEnabledKey] == true) {
+            // Read as the settings page reads it, so an address typed the way proxy apps give it
+            // works. Without one it can use, none typed included, the app starts without the proxy
+            // and says so in the listener's language: it was an English toast.
+            val proxy = ProxyAddress.parse(dataStore[ProxyUrlKey])?.let { address ->
+                runCatching { Proxy(dataStore[ProxyTypeKey].toEnum(defaultValue = Proxy.Type.HTTP), address) }
+                    .onFailure(::reportException)
+                    .getOrNull()
+            }
+            if (proxy != null) YouTube.proxy = proxy
+            else Toaster.show(this, R.string.proxy_not_used_at_start, Toast.LENGTH_LONG)
+        }
+
+        if (dataStore[UseLoginForBrowse] != false) {
+            YouTube.useLoginForBrowse = true
+        }
+
+        // A visitorData the player had to take from a /player answer, because the fetch below
+        // failed or left something unusable. Saved, so the next launch has one and does not
+        // fetch (and fail) again.
+        YTPlayerUtils.onVisitorDataFound = { found ->
+            GlobalScope.launch { dataStore.edit { it[VisitorDataKey] = found } }
+        }
+        // Which client served the last song, so the first one of this launch is asked of it and
+        // not of one YouTube was refusing an hour ago. Read here, like the keys above, and not by
+        // the player, which runs on every song. See StreamOrder.
+        YTPlayerUtils.streamMemory = StreamOrder.decode(dataStore[StreamOrderKey])
+        // The maintainer's playback block, from the document fetched last: see RemoteRoutes. It is
+        // read again whenever the document is.
+        RemoteRoutes.read(dataStore[CachedPollsJsonKey], BuildConfig.VERSION_CODE, dataStore[LastPollFetchKey] ?: 0L)
+        YTPlayerUtils.warmIfTheWebClientServedLast()
+        YTPlayerUtils.onStreamMemoryChanged = { changed ->
+            GlobalScope.launch { dataStore.edit { it[StreamOrderKey] = changed } }
+        }
+        // The songs played from another id because YouTube no longer serves their own. See StandIns.
+        StandInMemory.current = StandInMemory.decode(dataStore[StandInsKey])
+        StandInMemory.onChanged = { changed ->
+            GlobalScope.launch { dataStore.edit { it[StandInsKey] = changed } }
+        }
+        GlobalScope.launch {
+            dataStore.data
+                .map { it[VisitorDataKey] }
+                .distinctUntilChanged()
+                .collect { visitorData ->
+                    YouTube.visitorData = visitorData
+                        ?.takeIf { it != "null" } // Previously visitorData was sometimes saved as "null" due to a bug
+                        ?: YouTube.visitorData().onFailure {
+                            withContext(Dispatchers.Main) {
+                                Toaster.show(this@App, "Failed to get visitorData.", LENGTH_SHORT)
+                            }
+                            reportException(it)
+                        }.getOrNull()?.also { newVisitorData ->
+                            dataStore.edit { settings ->
+                                settings[VisitorDataKey] = newVisitorData
+                            }
+                        }
+                }
+        }
+        // Where YouTube sees this connection, asked only on a phone that points to a country where
+        // YouTube Music has no free plan (#68): see YouTubeRegion.
+        GlobalScope.launch(Dispatchers.IO) { YouTubeRegion.refresh(this@App) }
+        // What the switches under Library and content hide, read once here so that a queue started
+        // straight away already follows them, then followed. See ContentFilter.
+        ContentFilter.current = ContentFilter.of(dataStore.current)
+        GlobalScope.launch {
+            dataStore.data
+                .map { ContentFilter.of(it) }
+                .distinctUntilChanged()
+                .collect { ContentFilter.current = it }
+        }
+        GlobalScope.launch {
+            dataStore.data
+                .map { it[DataSyncIdKey] }
+                .distinctUntilChanged()
+                .collect { dataSyncId ->
+                    YouTube.dataSyncId = dataSyncId?.let {
+                        /*
+                         * Workaround to avoid breaking older installations that have a dataSyncId
+                         * that contains "||" in it.
+                         * If the dataSyncId ends with "||" and contains only one id, then keep the
+                         * id before the "||".
+                         * If the dataSyncId contains "||" and is not at the end, then keep the
+                         * second id.
+                         * This is needed to keep using the same account as before.
+                         */
+                        it.takeIf { !it.contains("||") }
+                            ?: it.takeIf { it.endsWith("||") }?.substringBefore("||")
+                            ?: it.substringAfter("||")
+                    }
+                }
+        }
+        GlobalScope.launch {
+            dataStore.data
+                .map { it[InnerTubeCookieKey] }
+                .distinctUntilChanged()
+                .collect { cookie ->
+                    // Signed in again, or out: a refusal of the old sign-in no longer holds (WhyStopped).
+                    YouTubeTrouble.signInChanged()
+                    try {
+                        YouTube.cookie = cookie
+                    } catch (e: Exception) {
+                        // we now allow user input now, here be the demons. This serves as a last ditch effort to avoid a crash loop
+                        Log.e(TAG, "Could not parse cookie. Clearing existing cookie. ${e.message}")
+                        forgetAccount(this@App)
+                    }
+                }
+        }
+    }
+
+    override fun newImageLoader(context: PlatformContext): ImageLoader {
+        val cacheSize = dataStore[MaxImageCacheSizeKey]
+
+        // will crash app if you set to 0 after cache starts being used
+        if (cacheSize == 0) {
+            return ImageLoader.Builder(this)
+                .components {
+                    add(CoilBitmapLoader.Factory(this@App))
+                    add(LocalArtworkPathKeyer())
+                // A downloaded song's kept cover, served from the app's own storage: see DownloadCovers.
+                add(DownloadCovers.Interceptor(filesDir))
+                }
+                // Covers fade in, and are there at once with animations off (CoverFade).
+                .transitionFactory(CoverFade())
+                .allowHardware(false)
+                .memoryCache {
+                    MemoryCache.Builder()
+                        .maxSizePercent(context, 0.3)
+                        .build()
+                }
+                .diskCachePolicy(CachePolicy.DISABLED)
+                .build()
+        }
+
+        return ImageLoader.Builder(this)
+            .components {
+                add(CoilBitmapLoader.Factory(this@App))
+                add(LocalArtworkPathKeyer())
+                // A downloaded song's kept cover, served from the app's own storage: see DownloadCovers.
+                add(DownloadCovers.Interceptor(filesDir))
+            }
+            // Covers fade in, and are there at once with animations off (CoverFade).
+            .transitionFactory(CoverFade())
+            // Hardware bitmaps left ON deliberately. This used to be allowHardware(false) globally,
+            // which forced every image into the Java heap as ARGB_8888. That was survivable while
+            // the player drew a 120px thumbnail, but artwork is now requested at the size it is
+            // actually drawn, and a 1152px cover is 5.06 MB of heap. The memory cache is 30% of a
+            // 192 MB heap, so it went from holding roughly a thousand covers to eleven, and every
+            // new track evicted the list thumbnails behind it, which is why artwork started
+            // reloading constantly.
+            //
+            // Nothing is lost by removing it: all three places that actually read pixels back
+            // already pass allowHardware(false) on their own request, and must keep doing so.
+            //   MainActivity.kt  extractThemeSource
+            //   Player.kt        extractGradientColors
+            //   SessionBitmapLoader, whose output is parcelled to the media session
+            .memoryCache {
+                MemoryCache.Builder()
+                    .maxSizePercent(context, 0.3)
+                    .build()
+            }
+            .diskCache(
+                // Local images should bypass with DataSource.DISK
+                DiskCache.Builder()
+                    .directory(cacheDir.resolve("coil"))
+                    .maxSizeBytes((cacheSize ?: 512) * 1024 * 1024L)
+                    .build()
+            )
+            .build()
+    }
+
+    companion object {
+        lateinit var instance: App
+            private set
+
+        fun forgetAccount(context: Context) {
+            runBlocking {
+                context.dataStore.edit { settings ->
+                    settings.remove(InnerTubeCookieKey)
+                    settings.remove(VisitorDataKey)
+                    settings.remove(DataSyncIdKey)
+                    settings.remove(AccountNameKey)
+                    settings.remove(AccountEmailKey)
+                    settings.remove(AccountChannelHandleKey)
+                    // The last sync times belong to the account that is going. Left behind,
+                    // they held the next account's first sync back behind the old one's
+                    // cooldowns, up to half an hour.
+                    listOf(
+                        LastFullSyncKey, LastLikeSongSyncKey, LastLibSongSyncKey, LastAlbumSyncKey,
+                        LastArtistSyncKey, LastPlaylistSyncKey, LastRecentActivitySyncKey,
+                    ).forEach { settings.remove(it) }
+                }
+            }
+            // The sign-in page keeps the same session in the web view's own cookies, which are
+            // not the app's to forget above: they stayed on the phone until that page was next
+            // opened. On the main thread, where the web view's parts are at home, and a phone
+            // with no web view has none to clear.
+            Handler(Looper.getMainLooper()).post {
+                runCatching {
+                    val cookies = CookieManager.getInstance()
+                    cookies.removeAllCookies { cookies.flush() }
+                }
+            }
+        }
+    }
+}

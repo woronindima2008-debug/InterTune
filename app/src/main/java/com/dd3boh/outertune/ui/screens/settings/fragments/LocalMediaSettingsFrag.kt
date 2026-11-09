@@ -1,0 +1,834 @@
+/*
+ * Copyright (C) 2025 OuterTune Project
+ *
+ * SPDX-License-Identifier: GPL-3.0
+ *
+ * For any other attributions, refer to the git commit history
+ */
+
+package com.dd3boh.outertune.ui.screens.settings.fragments
+
+import android.app.Activity
+import android.content.Intent
+import android.content.pm.PackageManager
+import android.net.Uri
+import android.os.Build
+import android.util.Log
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ColumnScope
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.selection.toggleable
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.Tune
+import androidx.compose.material.icons.rounded.Close
+import androidx.compose.material.icons.rounded.FolderOpen
+import androidx.compose.material.icons.rounded.MoreHoriz
+import androidx.compose.material.icons.rounded.Speed
+import androidx.compose.material.icons.rounded.TextFields
+import androidx.compose.material.icons.rounded.WarningAmber
+import androidx.compose.material3.Button
+import androidx.compose.material3.LocalContentColor
+import androidx.compose.material3.Checkbox
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.SnackbarDuration
+import androidx.compose.material3.Switch
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateListOf
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.pluralStringResource
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.unit.sp
+import androidx.core.app.ActivityCompat.requestPermissions
+import com.dd3boh.outertune.LocalDatabase
+import com.dd3boh.outertune.LocalPlayerConnection
+import com.dd3boh.outertune.LocalSnackbarHostState
+import com.dd3boh.outertune.R
+import com.dd3boh.outertune.constants.DownloadExtraPathKey
+import com.dd3boh.outertune.constants.DownloadPathKey
+import com.dd3boh.outertune.constants.ENABLE_FFMETADATAEX
+import com.dd3boh.outertune.constants.ExcludedScanPathsKey
+import com.dd3boh.outertune.constants.LastLocalScanKey
+import com.dd3boh.outertune.constants.LookupYtmArtistsKey
+import com.dd3boh.outertune.constants.SCANNER_OWNER_LM
+import com.dd3boh.outertune.constants.ScanPathsKey
+import com.dd3boh.outertune.constants.ScannerImpl
+import com.dd3boh.outertune.constants.ScannerImplKey
+import com.dd3boh.outertune.constants.ScannerMatchCriteria
+import com.dd3boh.outertune.constants.ScannerSensitivityKey
+import com.dd3boh.outertune.constants.ScannerStrictExtKey
+import com.dd3boh.outertune.constants.ScannerStrictFilePathsKey
+import com.dd3boh.outertune.constants.ThumbnailCornerRadius
+import com.dd3boh.outertune.ui.component.EnumListPreference
+import com.dd3boh.outertune.ui.component.PreferenceEntry
+import com.dd3boh.outertune.ui.component.SwitchPreference
+import com.dd3boh.outertune.ui.component.button.IconButton
+import com.dd3boh.outertune.ui.dialog.ActionPromptDialog
+import com.dd3boh.outertune.ui.dialog.InfoLabel
+import com.dd3boh.outertune.ui.utils.MEDIA_PERMISSION_LEVEL
+import com.dd3boh.outertune.ui.utils.clearDtCache
+import com.dd3boh.outertune.utils.lmScannerCoroutine
+import com.dd3boh.outertune.utils.rememberEnumPreference
+import com.dd3boh.outertune.utils.rememberPreference
+import com.dd3boh.outertune.utils.scanners.LocalMediaScanner.Companion.destroyScanner
+import com.dd3boh.outertune.utils.scanners.LocalMediaScanner.Companion.getScanner
+import com.dd3boh.outertune.utils.scanners.LocalMediaScanner.Companion.scannerProgressCurrent
+import com.dd3boh.outertune.utils.scanners.LocalMediaScanner.Companion.scannerProgressTotal
+import com.dd3boh.outertune.utils.scanners.LocalMediaScanner.Companion.scannerRequestCancel
+import com.dd3boh.outertune.utils.scanners.LocalMediaScanner.Companion.scannerState
+import com.dd3boh.outertune.utils.scanners.ScannerAbortException
+import com.dd3boh.outertune.utils.scanners.absoluteFilePathFromUri
+import com.dd3boh.outertune.utils.scanners.FolderNesting
+import com.dd3boh.outertune.utils.scanners.stringFromUriList
+import com.dd3boh.outertune.utils.scanners.uriListFromString
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
+import java.time.LocalDateTime
+import java.time.ZoneOffset
+import com.dd3boh.outertune.ui.screens.walkthrough.Tour
+import com.dd3boh.outertune.ui.screens.settings.settingRow
+import com.dd3boh.outertune.ui.screens.walkthrough.tourTarget
+
+
+@Composable
+fun ColumnScope.LocalScannerFrag() {
+    val context = LocalContext.current
+    val database = LocalDatabase.current
+    val coroutineScope = rememberCoroutineScope()
+    val playerConnection = LocalPlayerConnection.current
+    val snackbarHostState = LocalSnackbarHostState.current
+
+    // scanner vars
+    val scannerState by scannerState.collectAsState()
+    val scannerProgressTotal by scannerProgressTotal.collectAsState()
+    val scannerProgressCurrent by scannerProgressCurrent.collectAsState()
+
+    var scannerFailure = false
+    var mediaPermission by remember { mutableStateOf(true) }
+
+    /**
+     * True = include folders
+     * False = exclude folders
+     * Null = don't show dialog
+     */
+    var showAddFolderDialog: Boolean? by remember {
+        mutableStateOf(null)
+    }
+
+    // scanner prefs
+    val scannerSensitivity by rememberEnumPreference(
+        key = ScannerSensitivityKey,
+        defaultValue = ScannerMatchCriteria.LEVEL_2
+    )
+    val scannerImpl by rememberEnumPreference(
+        key = ScannerImplKey,
+        defaultValue = ScannerImpl.TAGLIB
+    )
+    val strictExtensions by rememberPreference(ScannerStrictExtKey, defaultValue = false)
+    val strictFilePaths by rememberPreference(ScannerStrictFilePathsKey, defaultValue = false)
+    val downloadPath by rememberPreference(DownloadPathKey, "")
+    val (scanPaths, onScanPathsChange) = rememberPreference(ScanPathsKey, defaultValue = "")
+    val (excludedScanPaths, onExcludedScanPathsChange) = rememberPreference(ExcludedScanPathsKey, defaultValue = "")
+    val dlPathExtra by rememberPreference(DownloadExtraPathKey, "")
+
+    var fullRescan by remember { mutableStateOf(false) }
+    val (lookupYtmArtists, onLookupYtmArtistsChange) = rememberPreference(LookupYtmArtistsKey, defaultValue = false)
+
+    val (lastLocalScan, onLastLocalScanChange) = rememberPreference(LastLocalScanKey, 0L)
+
+    // Deliberately not opening the folder dialog on its own any more.
+    //
+    // This used to fire whenever scanPaths was blank, which on a fresh install is always, so the
+    // local media step of setup covered itself with a folder picker before the page underneath had
+    // been read. It fired again on every return to the step, including pressing Back, so someone
+    // stepping through setup met it repeatedly. The page already offers the button; a screen that
+    // opens a dialog at you unasked is not offering anything.
+
+    // The folders to scan: what most people come to this page for, so it leads the card, with an
+    // icon and what is chosen now under it. Below the Scan button, with no icon and no line under
+    // it, it read as a heading (his word, 16 Oct 2026). With nothing chosen yet the icon takes the
+    // accent colour: Scan cannot do anything before this has been done.
+    val chosenFolders = remember(scanPaths) { uriListFromString(scanPaths) }
+    PreferenceEntry(
+        modifier = Modifier.tourTarget(Tour.SETTING_SCAN_PATHS).settingRow(R.string.scan_paths_title),
+        title = { Text(stringResource(R.string.scan_paths_title)) },
+        description = if (chosenFolders.isEmpty()) stringResource(R.string.scan_paths_none)
+        else chosenFolders.joinToString(", ") { folderName(context, it) },
+        icon = {
+            Icon(
+                Icons.Rounded.FolderOpen,
+                contentDescription = null,
+                tint = if (chosenFolders.isEmpty()) MaterialTheme.colorScheme.primary else LocalContentColor.current,
+            )
+        },
+        onClick = {
+            showAddFolderDialog = true
+        },
+    )
+
+    // scanner
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 20.dp),
+        verticalAlignment = Alignment.CenterVertically, // WHY WON'T YOU CENTER
+    ) {
+        Button(
+            onClick = {
+                // cancel button
+                if (scannerState > 0) {
+                    scannerRequestCancel = true
+                    return@Button
+                }
+
+                // check permission
+                if (context.checkSelfPermission(MEDIA_PERMISSION_LEVEL)
+                    != PackageManager.PERMISSION_GRANTED
+                ) {
+                    coroutineScope.launch {
+                        snackbarHostState.showSnackbar(
+                            message = context.getString(R.string.scanner_missing_storage_perm),
+                            withDismissAction = true,
+                            duration = SnackbarDuration.Short
+                        )
+                    }
+
+                    requestPermissions(
+                        context as Activity,
+                        arrayOf(MEDIA_PERMISSION_LEVEL), PackageManager.PERMISSION_GRANTED
+                    )
+
+                    mediaPermission = false
+                    return@Button
+                } else if (context.checkSelfPermission(MEDIA_PERMISSION_LEVEL)
+                    == PackageManager.PERMISSION_GRANTED
+                ) {
+                    mediaPermission = true
+                }
+
+                // No folder to scan yet: open the folder list instead of scanning nowhere. With the
+                // MediaStore scanner, scanning nowhere closed the app (issue #24).
+                if (uriListFromString(scanPaths).isEmpty()) {
+                    showAddFolderDialog = true
+                    return@Button
+                }
+
+                scannerFailure = false
+
+                playerConnection?.player?.pause()
+
+                coroutineScope.launch(lmScannerCoroutine) {
+                    if (scannerState > 0) {
+                        return@launch
+                    }
+                    // full rescan
+                    if (fullRescan) {
+                        try {
+                            val scanner = getScanner(context, scannerImpl, SCANNER_OWNER_LM)
+                            if (scannerImpl == ScannerImpl.MEDIASTORE) {
+                                scanner.fullMediaStoreSync(
+                                    database,
+                                    uriListFromString(scanPaths),
+                                    uriListFromString(excludedScanPaths),
+                                    scannerSensitivity,
+                                    strictExtensions,
+                                    strictFilePaths,
+                                    true,
+                                )
+                            } else {
+                                val uris = scanner.scanLocal(scanPaths, excludedScanPaths)
+                                scanner.fullSync(database, uris, scannerSensitivity, strictExtensions, strictFilePaths)
+                            }
+
+                            delay(1000)
+                            // start artist linking job
+                            if (lookupYtmArtists && scannerState <= 0) {
+                                coroutineScope.launch(lmScannerCoroutine) {
+                                    try {
+                                        snackbarHostState.showSnackbar(
+                                            message = context.getString(R.string.scanner_ytm_link_start),
+                                            withDismissAction = true,
+                                            duration = SnackbarDuration.Short
+                                        )
+                                        scanner.localToRemoteArtist(database)
+                                        snackbarHostState.showSnackbar(
+                                            message = context.getString(R.string.scanner_ytm_link_success),
+                                            withDismissAction = true,
+                                            duration = SnackbarDuration.Short
+                                        )
+                                    } catch (e: ScannerAbortException) {
+                                        // A stop, said as one: this was the success text with the reason after it.
+                                        snackbarHostState.showSnackbar(
+                                            message = "${context.getString(R.string.scanner_ytm_link_fail)}: ${e.message}",
+                                            withDismissAction = true,
+                                            duration = SnackbarDuration.Short
+                                        )
+                                    }
+                                }
+                            }
+                        } catch (e: ScannerAbortException) {
+                            scannerFailure = true
+
+                            snackbarHostState.showSnackbar(
+                                message = "${context.getString(R.string.scanner_scan_fail)}: ${e.message}",
+                                withDismissAction = true,
+                                duration = SnackbarDuration.Short
+                            )
+                        } catch (e: CancellationException) {
+                            throw e
+                        } catch (e: Exception) {
+                            // Any other failure says so here, as the scan at launch does, instead
+                            // of closing the app.
+                            Log.e("LocalMediaSettings", "Scan failed", e)
+                            scannerFailure = true
+                            snackbarHostState.showSnackbar(
+                                message = "${context.getString(R.string.scanner_scan_fail)}: ${e.message}",
+                                withDismissAction = true,
+                                duration = SnackbarDuration.Short
+                            )
+                        } finally {
+                            clearDtCache()
+                            destroyScanner(SCANNER_OWNER_LM)
+                        }
+                    } else {
+                        // quick scan
+                        try {
+                            val scanner = getScanner(context, scannerImpl, SCANNER_OWNER_LM)
+
+                            if (scannerImpl == ScannerImpl.MEDIASTORE) {
+                                scanner.fullMediaStoreSync(
+                                    database,
+                                    uriListFromString(scanPaths),
+                                    uriListFromString(excludedScanPaths),
+                                    scannerSensitivity,
+                                    strictExtensions,
+                                    strictFilePaths,
+                                    false
+                                )
+                            } else {
+                                val uris = scanner.scanLocal(scanPaths, excludedScanPaths)
+                                scanner.quickSync(
+                                    database, uris, scannerSensitivity, strictExtensions,
+                                    strictFilePaths
+                                )
+                            }
+
+                            delay(1000)
+                            // start artist linking job
+                            if (lookupYtmArtists && scannerState <= 0) {
+                                coroutineScope.launch(lmScannerCoroutine) {
+                                    try {
+                                        snackbarHostState.showSnackbar(
+                                            message = context.getString(R.string.scanner_ytm_link_start),
+                                            withDismissAction = true,
+                                            duration = SnackbarDuration.Short
+                                        )
+                                        scanner.localToRemoteArtist(database)
+                                        snackbarHostState.showSnackbar(
+                                            message = context.getString(R.string.scanner_ytm_link_success),
+                                            withDismissAction = true,
+                                            duration = SnackbarDuration.Short
+                                        )
+                                    } catch (e: ScannerAbortException) {
+                                        snackbarHostState.showSnackbar(
+                                            message = "${context.getString(R.string.scanner_ytm_link_fail)}: ${e.message}",
+                                            withDismissAction = true,
+                                            duration = SnackbarDuration.Short
+                                        )
+                                    }
+                                }
+                            }
+                        } catch (e: ScannerAbortException) {
+                            scannerFailure = true
+
+                            snackbarHostState.showSnackbar(
+                                message = "${context.getString(R.string.scanner_scan_fail)}: ${e.message}",
+                                withDismissAction = true,
+                                duration = SnackbarDuration.Short
+                            )
+                        } catch (e: CancellationException) {
+                            throw e
+                        } catch (e: Exception) {
+                            // Any other failure says so here, as the scan at launch does, instead
+                            // of closing the app.
+                            Log.e("LocalMediaSettings", "Scan failed", e)
+                            scannerFailure = true
+                            snackbarHostState.showSnackbar(
+                                message = "${context.getString(R.string.scanner_scan_fail)}: ${e.message}",
+                                withDismissAction = true,
+                                duration = SnackbarDuration.Short
+                            )
+                        } finally {
+                            clearDtCache()
+                            destroyScanner(SCANNER_OWNER_LM)
+                        }
+                    }
+
+                    // post scan actions
+                    playerConnection?.service?.initQueue()
+
+                    onLastLocalScanChange(LocalDateTime.now().toInstant(ZoneOffset.UTC).toEpochMilli())
+                }
+            }
+        ) {
+            Text(
+                text = if ((scannerState > 0 && scannerState < 4) || scannerState == 5) {
+                    stringResource(R.string.action_cancel)
+                } else if (scannerFailure) {
+                    stringResource(R.string.scanner_scan_fail)
+                } else if (scannerState >= 4) {
+                    stringResource(R.string.scanner_progress_complete)
+                } else if (!mediaPermission) {
+                    stringResource(R.string.scanner_missing_storage_perm)
+                } else {
+                    stringResource(R.string.scanner_btn_idle)
+                }
+            )
+        }
+
+
+        // progress indicator
+        if (scannerState <= 0) {
+            return@Row
+        }
+
+        Spacer(Modifier.width(8.dp))
+
+        CircularProgressIndicator(
+            modifier = Modifier
+                .size(32.dp),
+            color = MaterialTheme.colorScheme.secondary,
+            trackColor = MaterialTheme.colorScheme.surfaceVariant,
+        )
+
+        Spacer(Modifier.width(8.dp))
+
+        Column {
+//            val isSyncing = scannerState > 3
+            Text(
+                text = when (scannerState) {
+                    1 -> stringResource(R.string.scanner_progress_discovering)
+                    3 -> stringResource(R.string.scanner_progress_syncing)
+                    5 -> stringResource(R.string.scanner_ytm_link_start)
+                    else -> stringResource(R.string.scanner_progress_processing)
+                },
+                color = MaterialTheme.colorScheme.secondary,
+                // Not fontSize alone: that kept the body text's 24 sp line height.
+                style = MaterialTheme.typography.bodySmall,
+            )
+            Text(
+                text = "${if (scannerProgressCurrent >= 0) "$scannerProgressCurrent" else "—"}/${
+                    if (scannerProgressTotal >= 0) {
+                        if (scannerState == 1) {
+                            pluralStringResource(
+                                R.plurals.scanner_n_song_found, scannerProgressTotal, scannerProgressTotal
+                            )
+                        } else {
+                            pluralStringResource(
+                                R.plurals.scanner_n_song_processed, scannerProgressTotal, scannerProgressTotal
+                            )
+                        }
+                    } else {
+                        "—"
+                    }
+                }",
+                color = MaterialTheme.colorScheme.secondary,
+                // Not fontSize alone: that kept the body text's 24 sp line height.
+                style = MaterialTheme.typography.bodySmall,
+            )
+        }
+    }
+    // scanner checkboxes
+    //
+    // On the card's own lines, as the rows around them: each box centred on the icons' column (32 dp
+    // in), each label starting where the titles start (60 dp in), the whole line a tap target. They
+    // sat 12 dp further in, their labels 8 dp right of every title above and below, and a label with
+    // only its size set kept the body text's 24 sp line height, two lines that read as four.
+    Column(
+        // Apart, or the two labels, two or three lines each, read as one paragraph.
+        verticalArrangement = Arrangement.spacedBy(4.dp),
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 4.dp)
+    ) {
+        ScannerCheckboxRow(
+            checked = fullRescan,
+            onCheckedChange = { fullRescan = it },
+            label = stringResource(R.string.scanner_variant_rescan),
+        )
+        ScannerCheckboxRow(
+            checked = lookupYtmArtists,
+            onCheckedChange = onLookupYtmArtistsChange,
+            label = stringResource(R.string.scanner_online_artist_linking),
+        )
+    }
+
+    // 16 dp under the last line, as the card has over its first row: with 8 the card ended
+    // tighter at the bottom than at the top.
+    Row(
+        modifier = Modifier.padding(start = 20.dp, end = 20.dp, top = 8.dp, bottom = 16.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Icon(
+            Icons.Rounded.WarningAmber,
+            contentDescription = null,
+            tint = MaterialTheme.colorScheme.error,
+        )
+
+        // The small body style, whose line height goes with its size: with only fontSize = 12.sp
+        // the lines kept the body text's 24 sp and stood twice their height apart.
+        Text(
+            stringResource(R.string.scanner_warning),
+            color = MaterialTheme.colorScheme.secondary,
+            style = MaterialTheme.typography.bodySmall,
+            modifier = Modifier.padding(horizontal = 16.dp)
+        )
+    }
+
+
+    /**
+     * ---------------------------
+     * Dialogs
+     * ---------------------------
+     */
+
+
+    if (showAddFolderDialog != null) {
+        var tempScanPaths = remember { mutableStateListOf<Uri>() }
+        // Only a folder picked in this run of the dialog is checked against the rules below. An
+        // install with a download folder already inside an existing scan folder (allowed by older
+        // versions, which only refused the identical folder) used to fail the check for every
+        // saved scan path every time the dialog opened, so OK stayed disabled whatever else was
+        // changed, with no row highlighted and no message explaining why.
+        val sessionAddedPaths = remember { mutableStateListOf<Uri>() }
+        LaunchedEffect(showAddFolderDialog, scanPaths, excludedScanPaths) {
+            tempScanPaths.clear()
+            sessionAddedPaths.clear()
+            tempScanPaths.addAll(
+                uriListFromString(if (showAddFolderDialog == true) scanPaths else excludedScanPaths)
+            )
+        }
+
+        // Whether [candidate] itself sits at or inside the download folder or an extra download
+        // folder: scanning it in would import the download folder's own files as local songs too.
+        // Excluding such a folder is harmless, so this is only checked for folders to scan.
+        // FolderNesting, not string .contains(), which took a folder like MusicVideos for one
+        // inside Music.
+        fun sitsInsideADownloadDir(candidate: Uri): Boolean {
+            if (showAddFolderDialog != true) return false
+            return (uriListFromString(downloadPath) + uriListFromString(dlPathExtra)).any { dl ->
+                FolderNesting.isSameOrInside(candidate.toString(), dl.toString())
+            }
+        }
+
+        // The download folder or extra download folder [candidate] itself holds, if any. Named,
+        // not just a flag, so the row can say which one.
+        fun holdingADownloadDir(candidate: Uri): Uri? {
+            if (showAddFolderDialog != true) return null
+            return (uriListFromString(downloadPath) + uriListFromString(dlPathExtra)).firstOrNull { dl ->
+                FolderNesting.isSameOrInside(dl.toString(), candidate.toString())
+            }
+        }
+
+        ActionPromptDialog(
+            titleBar = {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    // the title is the switch between the two lists, read with it as one
+                    modifier = Modifier.toggleable(
+                        value = showAddFolderDialog == true,
+                        role = Role.Switch,
+                        onValueChange = { showAddFolderDialog = it },
+                    ),
+                ) {
+                    Text(
+                        text = stringResource(
+                            if (showAddFolderDialog as Boolean) R.string.scan_paths_incl
+                            else R.string.scan_paths_excl
+                        ),
+                        style = MaterialTheme.typography.titleLarge,
+                    )
+
+                    // switch between include and exclude
+                    Row(
+                        modifier = Modifier.weight(1f),
+                        horizontalArrangement = Arrangement.End
+                    ) {
+                        Switch(
+                            checked = showAddFolderDialog!!,
+                            onCheckedChange = null,
+                        )
+                    }
+                }
+            },
+            onDismiss = {
+                showAddFolderDialog = null
+                tempScanPaths.clear()
+            },
+            onConfirm = {
+                if (showAddFolderDialog as Boolean) {
+                    onScanPathsChange(stringFromUriList(tempScanPaths.toList()))
+                } else {
+                    onExcludedScanPathsChange(stringFromUriList(tempScanPaths.toList()))
+                }
+
+                showAddFolderDialog = null
+                tempScanPaths.clear()
+            },
+            onReset = {
+                // clear all, let user select a new path on their own will
+                tempScanPaths.clear()
+            },
+            onCancel = {
+                showAddFolderDialog = null
+                tempScanPaths.clear()
+            },
+            isInputValid = tempScanPaths.toList().all {
+                // A path already saved from before this dialog opened is kept as it is: only one
+                // picked just now is held to the rules, or a folder allowed under an older,
+                // narrower rule could never be got past again, on a screen with nothing on it
+                // saying why. A saved row that does overlap is still shown below, in a neutral
+                // tone rather than as a blocking error.
+                it !in sessionAddedPaths || (!sitsInsideADownloadDir(it) && holdingADownloadDir(it) == null)
+            } || tempScanPaths.isEmpty()
+        ) {
+            val dirPickerLauncher = rememberLauncherForActivityResult(
+                ActivityResultContracts.OpenDocumentTree()
+            ) { uri ->
+                if (uri == null) return@rememberLauncherForActivityResult
+                if (tempScanPaths.any { it.toString() == uri.toString() }) return@rememberLauncherForActivityResult
+
+                val contentResolver = context.contentResolver
+                val takeFlags: Int = Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION
+                contentResolver.takePersistableUriPermission(uri, takeFlags)
+                tempScanPaths.add(uri)
+                sessionAddedPaths.add(uri)
+            }
+
+            Text(
+                text = stringResource(R.string.scan_paths_description),
+                style = MaterialTheme.typography.bodySmall,
+                modifier = Modifier.padding(horizontal = 4.dp)
+            )
+            Spacer(Modifier.padding(vertical = 8.dp))
+
+            // folders list
+            Column(
+                modifier = Modifier
+                    .padding(vertical = 12.dp)
+                    .border(
+                        2.dp,
+                        MaterialTheme.colorScheme.primary.copy(alpha = 0.5f),
+                        RoundedCornerShape(ThumbnailCornerRadius)
+                    )
+            ) {
+                tempScanPaths.forEach {
+                    val holdsDownloadDir = holdingADownloadDir(it)
+                    val insideDownloadDir = sitsInsideADownloadDir(it)
+                    val overlapsDownloadDir = holdsDownloadDir != null || insideDownloadDir
+                    // Only a row picked in this run of the dialog can block OK; a saved row that
+                    // overlaps is shown, not enforced.
+                    val blocking = overlapsDownloadDir && it in sessionAddedPaths
+                    val rowColor = when {
+                        blocking -> MaterialTheme.colorScheme.errorContainer
+                        overlapsDownloadDir -> MaterialTheme.colorScheme.surfaceVariant
+                        else -> Color.Transparent
+                    }
+                    val textColor =
+                        if (blocking) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant
+                    Row(
+                        modifier = Modifier
+                            .padding(horizontal = 8.dp)
+                            .background(rowColor)
+                            .clickable { }) {
+                        Column(
+                            modifier = Modifier
+                                .weight(1f)
+                                .align(Alignment.CenterVertically)
+                        ) {
+                            Text(
+                                text = absoluteFilePathFromUri(context, it) ?: it.toString(),
+                                style = MaterialTheme.typography.bodySmall,
+                            )
+                            if (holdsDownloadDir != null) {
+                                Text(
+                                    text = if (blocking) stringResource(
+                                        R.string.scanner_holds_download_dir,
+                                        absoluteFilePathFromUri(context, holdsDownloadDir) ?: holdsDownloadDir.toString()
+                                    ) else stringResource(R.string.scanner_overlap_kept),
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = textColor,
+                                )
+                            } else if (insideDownloadDir) {
+                                Text(
+                                    text = stringResource(
+                                        if (blocking) R.string.scanner_rejected_dir else R.string.scanner_overlap_kept
+                                    ),
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = textColor,
+                                )
+                            }
+                        }
+                        IconButton(
+                            onClick = {
+                                tempScanPaths.remove(it)
+                                sessionAddedPaths.remove(it)
+                            },
+                        ) {
+                            Icon(
+                                imageVector = Icons.Rounded.Close,
+                                contentDescription = null,
+                            )
+                        }
+                    }
+                }
+            }
+
+            // add folder button
+            Column {
+                Button(onClick = { dirPickerLauncher.launch(null) }) {
+                    Text(stringResource(R.string.scan_paths_add_folder))
+                }
+
+                InfoLabel(
+                    text = stringResource(R.string.scan_paths_tooltip),
+                    modifier = Modifier.padding(top = 8.dp)
+                )
+
+                if (tempScanPaths.toList().any {
+                        it in sessionAddedPaths && (sitsInsideADownloadDir(it) || holdingADownloadDir(it) != null)
+                    }) {
+                    InfoLabel(
+                        text = stringResource(R.string.scanner_rejected_dir),
+                        isError = true,
+                        modifier = Modifier.padding(top = 8.dp)
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun ColumnScope.LocalScannerExtraFrag() {
+    val context = LocalContext.current
+
+    val (scannerSensitivity, onScannerSensitivityChange) = rememberEnumPreference(
+        key = ScannerSensitivityKey,
+        defaultValue = ScannerMatchCriteria.LEVEL_2
+    )
+    val (scannerImpl, onScannerImplChange) = rememberEnumPreference(
+        key = ScannerImplKey,
+        defaultValue = ScannerImpl.TAGLIB
+    )
+    val (strictExtensions, onStrictExtensionsChange) = rememberPreference(ScannerStrictExtKey, defaultValue = false)
+    val (strictFilePaths, onStrictFilePathsChange) = rememberPreference(ScannerStrictFilePathsKey, defaultValue = false)
+
+
+    // scanner sensitivity
+    EnumListPreference(
+        modifier = Modifier.tourTarget(Tour.SETTING_SCANNER_SENSITIVITY).settingRow(R.string.scanner_sensitivity_title),
+        title = { Text(stringResource(R.string.scanner_sensitivity_title)) },
+        icon = { Icon(Icons.Rounded.Tune, null) },
+        selectedValue = scannerSensitivity,
+        onValueSelected = onScannerSensitivityChange,
+        valueText = {
+            when (it) {
+                ScannerMatchCriteria.LEVEL_1 -> stringResource(R.string.scanner_sensitivity_L1)
+                ScannerMatchCriteria.LEVEL_2 -> stringResource(R.string.scanner_sensitivity_L2)
+                ScannerMatchCriteria.LEVEL_3 -> stringResource(R.string.scanner_sensitivity_L3)
+            }
+        },
+        isEnabled = !strictFilePaths,
+    )
+    // strict file ext
+    SwitchPreference(
+        modifier = Modifier.settingRow(R.string.scanner_strict_file_name_title),
+        title = { Text(stringResource(R.string.scanner_strict_file_name_title)) },
+        description = stringResource(R.string.scanner_strict_file_name_description),
+        icon = { Icon(Icons.Rounded.TextFields, null) },
+        isEnabled = !strictFilePaths,
+        checked = strictExtensions,
+        onCheckedChange = onStrictExtensionsChange
+    )
+    // compare file path only
+    SwitchPreference(
+        modifier = Modifier.settingRow(R.string.scanner_strict_file_paths_title),
+        title = { Text(stringResource(R.string.scanner_strict_file_paths_title)) },
+        description = stringResource(R.string.scanner_strict_file_paths_description),
+        icon = { Icon(Icons.Rounded.MoreHoriz, null) },
+        checked = strictFilePaths,
+        onCheckedChange = onStrictFilePathsChange,
+    )
+    // scanner type
+    EnumListPreference(
+        modifier = Modifier.settingRow(R.string.scanner_type_title),
+        title = { Text(stringResource(R.string.scanner_type_title)) },
+        icon = { Icon(Icons.Rounded.Speed, null) },
+        selectedValue = scannerImpl,
+        onValueSelected = onScannerImplChange,
+        valueText = {
+            when (it) {
+                ScannerImpl.MEDIASTORE -> stringResource(R.string.scanner_type_mediastore)
+                ScannerImpl.TAGLIB -> stringResource(R.string.scanner_type_taglib)
+                ScannerImpl.FFMPEG_EXT -> stringResource(R.string.scanner_type_ffmpeg_ext)
+            }
+        },
+        disabled = { it == ScannerImpl.FFMPEG_EXT && !ENABLE_FFMETADATAEX && Build.VERSION.SDK_INT >= Build.VERSION_CODES.R },
+        values = ScannerImpl.entries,
+    )
+    InfoLabel(stringResource(R.string.scanner_type_tooltip))
+}
+
+/** A scan folder by its own name, "Music" for /storage/emulated/0/Music, for the line under the row. */
+private fun folderName(context: android.content.Context, uri: Uri): String =
+    absoluteFilePathFromUri(context, uri)?.trimEnd('/')?.substringAfterLast('/')?.takeIf { it.isNotBlank() }
+        ?: uri.lastPathSegment?.substringAfterLast(':')?.substringAfterLast('/')?.takeIf { it.isNotBlank() }
+        ?: uri.toString()
+
+/**
+ * A scanner option as a line of the card: the box where the rows have their icons, the label where
+ * they have their titles, and the whole line a tap target. The box keeps its 48 dp touch target,
+ * which with 8 dp in front centres it on the icons' column.
+ */
+@Composable
+private fun ScannerCheckboxRow(checked: Boolean, onCheckedChange: (Boolean) -> Unit, label: String) {
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        modifier = Modifier
+            .fillMaxWidth()
+            .toggleable(value = checked, role = Role.Checkbox, onValueChange = onCheckedChange)
+            .padding(start = 8.dp, end = 16.dp, top = 2.dp, bottom = 2.dp)
+    ) {
+        Checkbox(checked = checked, onCheckedChange = null, modifier = Modifier.size(48.dp))
+        Spacer(Modifier.width(4.dp))
+        Text(label, color = MaterialTheme.colorScheme.secondary, style = MaterialTheme.typography.bodyMedium)
+    }
+}

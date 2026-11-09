@@ -1,0 +1,9 @@
+[submodule "ffMetadataEx"]
+	path = ffMetadataEx
+	url = https://github.com/OuterTune/ffMetadataEx
+[submodule "taglib"]
+	path = taglib
+	url = https://github.com/OuterTune/taglib
+[submodule "innertubex"]
+	path = innertubex
+	url = https://github.com/MetrolistGroup/innertubex

@@ -1,0 +1,511 @@
+/*
+ * Copyright (C) 2026 InterTune
+ *
+ * SPDX-License-Identifier: GPL-3.0
+ */
+
+package com.dd3boh.outertune.utils
+
+import android.content.Context
+import android.util.Log
+import androidx.datastore.preferences.core.edit
+import com.dd3boh.outertune.BuildConfig
+import com.dd3boh.outertune.constants.AnnouncementsEnabledKey
+import com.dd3boh.outertune.constants.AnsweredPollIdsKey
+import com.dd3boh.outertune.constants.CachedPollsJsonKey
+import com.dd3boh.outertune.constants.DismissedAnnouncementIdsKey
+import com.dd3boh.outertune.constants.ViewedPollIdsKey
+import com.dd3boh.outertune.constants.DismissedPollIdsKey
+import com.dd3boh.outertune.constants.LastPollFetchKey
+import com.dd3boh.outertune.constants.Polls
+import com.dd3boh.outertune.constants.PollFetchVersionKey
+import com.dd3boh.outertune.constants.PollsEnabledKey
+import com.dd3boh.outertune.constants.Unreleased
+import com.dd3boh.outertune.extensions.isInternetConnected
+import dagger.hilt.android.qualifiers.ApplicationContext
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.withContext
+import okhttp3.MediaType.Companion.toMediaType
+import okhttp3.OkHttpClient
+import okhttp3.Request
+import okhttp3.RequestBody.Companion.toRequestBody
+import org.json.JSONArray
+import org.json.JSONObject
+import java.io.File
+import java.util.concurrent.TimeUnit
+import javax.inject.Inject
+import javax.inject.Singleton
+
+/**
+ * Fetches the occasional question from the maintainer, and sends back an answer.
+ *
+ * Deliberately shaped like [UpdateChecker], because the problem is the same one: read a small
+ * json document from a third party, remember what it said across restarts, and never pester
+ * somebody about a thing they have already dealt with.
+ *
+ * WHAT LEAVES THE DEVICE, in full, because this is the part that has to be true when the modal
+ * says the answer is anonymous:
+ *  - a GET for the poll list, which reveals only that some InterTune install looked
+ *  - on answering, one POST carrying the poll id and its question, the chosen options' ids and
+ *    labels, the words typed into an "Other" box when there are some, and the app version;
+ *    a follow-up question's picks go in that same event, as "<optionId>/<followUpOptionId>"
+ *  - on first opening a poll or an announcement, one POST carrying its id, its text, whether it
+ *    was a poll or an announcement, and the app version: once per install, never again for it
+ * No account, no device id, no install id, no library, nothing derived from the hardware. Umami
+ * works out its own visitor figure server side from a rotating hash it computes itself, so the app
+ * has no need to identify anyone and does not.
+ *
+ * Opt in, and silent about it. Until [PollsEnabledKey] or [AnnouncementsEnabledKey] is true nothing
+ * is fetched at all, so there is not even a request to explain. Each only shows what it is for.
+ */
+@Singleton
+class PollChecker @Inject constructor(
+    @ApplicationContext private val context: Context,
+) {
+    data class Option(
+        val id: String,
+        val label: String,
+        /** Optional picture for this choice. */
+        val imageUrl: String?,
+        /** "Other": picking it opens a box for the person's own words, sent with the answer. */
+        val other: Boolean = false,
+        /** The box's hint for an "Other" option; the app's own words when the document has none. */
+        val placeholder: String? = null,
+        /** The question asked right after this option is picked ("then"); null for none. */
+        val then: FollowUp? = null,
+    )
+
+    /**
+     * A question that comes right after its option is picked, in the same card, and goes in the same
+     * answer (PollFollowUps). One level only: its options never have one of their own.
+     */
+    data class FollowUp(
+        val question: String,
+        /** Optional longer explanation under the question. */
+        val body: String?,
+        val options: List<Option>,
+        /** True when more than one option may be chosen. */
+        val multiple: Boolean,
+    )
+
+    data class Poll(
+        val id: String,
+        /** One line, for the banner at the top of Home. */
+        val banner: String,
+        /** The question itself, shown in the modal. */
+        val question: String,
+        /** Optional longer explanation under the question. */
+        val body: String?,
+        /** Optional picture above the question. */
+        val imageUrl: String?,
+        val options: List<Option>,
+        /** True when more than one option may be chosen. */
+        val multiple: Boolean,
+    )
+
+    private val _current = MutableStateFlow<Poll?>(null)
+
+    /** The question worth asking right now, or null when there is nothing to ask. */
+    val current: StateFlow<Poll?> = _current.asStateFlow()
+
+    private val _currentAnnouncement = MutableStateFlow<Announcement?>(null)
+
+    /** The announcement worth showing right now, or null when there is nothing to say. */
+    val currentAnnouncement: StateFlow<Announcement?> = _currentAnnouncement.asStateFlow()
+
+    /**
+     * Set when something outside the screen asks for the question to be opened, which today means
+     * the background notification being tapped.
+     *
+     * A flag rather than navigation because the question is a dialog over Home, not a destination,
+     * so there is no route to send anybody to. Home consumes it and clears it.
+     */
+    private val _openRequested = MutableStateFlow(false)
+    val openRequested: StateFlow<Boolean> = _openRequested.asStateFlow()
+
+    fun requestOpen() {
+        _openRequested.value = true
+    }
+
+    fun consumeOpenRequest() {
+        _openRequested.value = false
+    }
+
+    private val client by lazy {
+        OkHttpClient.Builder()
+            .connectTimeout(10, TimeUnit.SECONDS)
+            .readTimeout(10, TimeUnit.SECONDS)
+            .build()
+    }
+
+    /**
+     * Looks for a question that has not been dealt with.
+     *
+     * [force] skips the rate limit, for the check button on the settings screen.
+     */
+    suspend fun check(force: Boolean = false): Poll? = withContext(Dispatchers.IO) {
+        if (!Polls.isConfigured) return@withContext null
+
+        val store = context.dataStore
+        // One document holds both, so it is fetched when either is wanted, and neither is shown
+        // unless it is wanted itself. Both off clears what is on screen, so switching off takes
+        // the banner away at once rather than at the next launch.
+        if (!store.get(PollsEnabledKey, false) && !store.get(AnnouncementsEnabledKey, false)) {
+            _current.value = null
+            _currentAnnouncement.value = null
+            return@withContext null
+        }
+        // A document put on the phone to try a question before it goes out: see standIn.
+        standIn()?.let { return@withContext pick(it) }
+        // Offline means the check could not be made, not that there is nothing to ask: a question
+        // already fetched keeps showing, as it does when the fetch below fails.
+        if (!context.isInternetConnected()) return@withContext restoreFromCache()
+
+        val last = store.get(LastPollFetchKey, 0L)
+        val now = System.currentTimeMillis()
+        // The saved document is only good for the build that fetched it. After an update the old
+        // copy was shown for up to six hours, so the first announcement of a release reached
+        // everyone who updated as whatever the file said before it, pictures missing.
+        val fetchedByThisBuild = store.get(PollFetchVersionKey, 0) == BuildConfig.VERSION_CODE
+        if (!force && fetchedByThisBuild && now - last < MIN_FETCH_INTERVAL_MS) {
+            // Re-derive from the cached document rather than reporting the in-memory value, which
+            // is null on every process start. Same fault the update checker had.
+            return@withContext restoreFromCache()
+        }
+
+        val body = runCatching {
+            client.newCall(Request.Builder().url(Polls.POLLS_URL).build())
+                .execute().use { response ->
+                    if (!response.isSuccessful) return@runCatching null
+                    response.body?.string()
+                }
+        }.getOrNull() ?: run {
+            Log.i(TAG, "Poll fetch failed, leaving the last fetch time alone so it retries")
+            return@withContext restoreFromCache()
+        }
+
+        // Only stamp the clock once something actually answered, so one flaky moment does not
+        // suppress fetching for the whole interval.
+        context.dataStore.edit {
+            it[LastPollFetchKey] = now
+            it[CachedPollsJsonKey] = body
+            it[PollFetchVersionKey] = BuildConfig.VERSION_CODE
+        }
+
+        pick(body)
+    }
+
+    /**
+     * Announcements rode on the questions switch until they got their own. Whoever had said yes to
+     * questions and was never asked about news keeps getting it: written down at launch, so from
+     * then on the two switches are independent. Someone who never answered for either is asked
+     * about the two as one, and the catch-up screen decides who that is when it opens
+     * (catchUpQuestions).
+     */
+    suspend fun adoptNewsChoice() = withContext(Dispatchers.IO) {
+        val store = context.dataStore
+        if (store[AnnouncementsEnabledKey] == null && store.get(PollsEnabledKey, false)) {
+            store.edit { it[AnnouncementsEnabledKey] = true }
+        }
+    }
+
+    /**
+     * A poll document on the phone itself, to try a question on a debug or preview build before it
+     * goes out (docs/announcements.md): files/poll-stand-in.json in the app's own storage, which only
+     * adb can put there (run-as). While it is there it is read in place of the gist, and nothing is
+     * sent: an answer goes to the log, so a test never lands among the real answers. Never in a
+     * release.
+     */
+    private fun standIn(): String? = if (!BuildConfig.DEBUG) null
+    else runCatching { File(context.filesDir, STAND_IN).takeIf { it.isFile }?.readText() }.getOrNull()
+
+    /** Re-reads the cached document and picks again, since what counts as unanswered has moved. */
+    private suspend fun restoreFromCache(): Poll? {
+        val cached = context.dataStore.get(CachedPollsJsonKey, "")
+        if (cached.isEmpty()) return null
+        return pick(cached)
+    }
+
+    /**
+     * Chooses the first question this user has not dealt with.
+     *
+     * Order is the maintainer's: whatever is first in the document and still applicable wins, so
+     * questions can be queued up and worked through one at a time rather than all at once.
+     */
+    private suspend fun pick(json: String): Poll? {
+        val store = context.dataStore
+        // The playback block rides in the same document: see RemoteRoutes. Read whatever the two
+        // switches say, since it is about playback and shows nothing.
+        RemoteRoutes.read(json, BuildConfig.VERSION_CODE, store.get(LastPollFetchKey, 0L))
+        val answered = store.get(AnsweredPollIdsKey, emptySet())
+        val dismissed = store.get(DismissedPollIdsKey, emptySet())
+
+        val chosen = if (!store.get(PollsEnabledKey, false)) null
+        else runCatching { parse(json) }.getOrNull().orEmpty().firstOrNull {
+            it.id !in answered && it.id !in dismissed
+        }
+        _current.value = chosen
+        if (chosen != null) Log.i(TAG, "Poll available: ${chosen.id}")
+
+        // Picked from the same document in the same pass. The two are independent: an announcement
+        // is not answered, only closed, so it has its own dismissed set and neither hides the
+        // other.
+        val dismissedNotes = store.get(DismissedAnnouncementIdsKey, emptySet())
+        val note = if (!store.get(AnnouncementsEnabledKey, false)) null
+        else AnnouncementParser.parse(json, BuildConfig.VERSION_CODE, System.currentTimeMillis())
+            .firstOrNull { it.id !in dismissedNotes }
+        _currentAnnouncement.value = note
+        if (note != null) Log.i(TAG, "Announcement available: ${note.id}")
+
+        return chosen
+    }
+
+    /**
+     * Reads the poll list.
+     *
+     * org.json rather than kotlinx.serialization because this module does not apply the
+     * serialization plugin, and one document is not worth a build change for.
+     *
+     * A malformed entry is skipped rather than failing the document, so one bad poll cannot stop
+     * every later one from being asked. Version bounds are applied here: a question about a feature
+     * makes no sense to somebody on a build that does not have it.
+     */
+    private fun parse(json: String): List<Poll> {
+        val phone = DeviceFacts.current()
+        val root = JSONObject(json)
+        val arr = root.optJSONArray("polls") ?: JSONArray()
+        val now = System.currentTimeMillis()
+
+        return (0 until arr.length()).mapNotNull { i ->
+            runCatching {
+                val o = arr.getJSONObject(i)
+
+                val min = o.optInt("minVersionCode", 0)
+                val max = o.optInt("maxVersionCode", Int.MAX_VALUE)
+                if (BuildConfig.VERSION_CODE < min || BuildConfig.VERSION_CODE > max) return@runCatching null
+                // Android versions and devices, the same three fields an announcement takes.
+                if (AnnouncementParser.audienceOfEntry(o.toString())?.includes(phone) != true) return@runCatching null
+
+                // Epoch millis. A poll that outlives its usefulness stops asking on its own, so
+                // somebody who has not opened the app in months is not met with a stale question.
+                val expires = o.optLong("expiresAt", 0L)
+                if (expires in 1 until now) return@runCatching null
+
+                val optionsArr = o.optJSONArray("options") ?: return@runCatching null
+                val options = (0 until optionsArr.length()).mapNotNull { j ->
+                    val oo = optionsArr.optJSONObject(j) ?: return@mapNotNull null
+                    val id = oo.optString("id").ifEmpty { return@mapNotNull null }
+                    val label = oo.optString("label").ifEmpty { return@mapNotNull null }
+                    Option(
+                        id, label, oo.optString("image").ifEmpty { null },
+                        other = oo.optBoolean("other", false),
+                        placeholder = oo.optString("placeholder").ifEmpty { null },
+                        // With follow-ups off, "then" is ignored, as every older build ignores it.
+                        then = PollFollowUps.read(id, oo.optJSONObject("then")?.toString(), Unreleased.POLL_FOLLOW_UPS),
+                    )
+                }
+                if (options.isEmpty()) return@runCatching null
+
+                Poll(
+                    id = o.optString("id").ifEmpty { return@runCatching null },
+                    banner = o.optString("banner").ifEmpty { return@runCatching null },
+                    question = o.optString("question").ifEmpty { return@runCatching null },
+                    body = o.optString("body").ifEmpty { null },
+                    imageUrl = o.optString("image").ifEmpty { null },
+                    options = options,
+                    multiple = o.optBoolean("multiple", false),
+                )
+            }.getOrNull()
+        }
+    }
+
+    /** Closes an announcement, for good. There is nothing to answer, so this is the only verb. */
+    suspend fun dismissAnnouncement(id: String) {
+        context.dataStore.edit { prefs ->
+            prefs[DismissedAnnouncementIdsKey] = prefs[DismissedAnnouncementIdsKey].orEmpty() + id
+        }
+        _currentAnnouncement.value = null
+    }
+
+    /**
+     * Sends one answer, then never asks that question again.
+     *
+     * The local record is written whatever the network does. Somebody who answered should not be
+     * asked a second time because a request failed, and a lost answer is a far smaller problem than
+     * a modal that keeps reappearing.
+     */
+    suspend fun answer(poll: Poll, optionIds: List<String>, otherText: String? = null) = withContext(Dispatchers.IO) {
+        markAnswered(poll.id)
+
+        if (!Polls.isConfigured) return@withContext
+        val data = answerData(poll, optionIds, otherText, BuildConfig.VERSION_NAME)
+        if (standIn() != null) {
+            Log.i(TAG, "Stand-in document: answer kept on the phone, it would send $data")
+            return@withContext
+        }
+        send(Polls.UMAMI_EVENT, JSONObject(data))
+    }
+
+    /**
+     * Counts the first opening of a poll or an announcement, once per install.
+     *
+     * Only ever reached with questions switched on, since nothing is fetched otherwise and so
+     * nothing can be opened. The record is written before sending, as with an answer: a failed
+     * request is one uncounted view, not a count that repeats.
+     */
+    suspend fun viewed(id: String, text: String, isAnnouncement: Boolean) = withContext(Dispatchers.IO) {
+        var first = false
+        context.dataStore.edit {
+            val seen = it[ViewedPollIdsKey].orEmpty()
+            if (id !in seen) {
+                it[ViewedPollIdsKey] = seen + id
+                first = true
+            }
+        }
+        if (!first || !Polls.isConfigured || standIn() != null) return@withContext
+        send(
+            Polls.UMAMI_VIEW_EVENT,
+            JSONObject()
+                .put("poll", text.take(MAX_PROPERTY_CHARS))
+                .put("poll_id", id)
+                .put("type", if (isAnnouncement) "announcement" else "poll")
+                .put("version", BuildConfig.VERSION_NAME),
+        )
+    }
+
+    /** One Umami event, with the same fixed identity for every install. See [USER_AGENT]. */
+    private fun send(name: String, data: JSONObject) {
+        runCatching {
+            val payload = JSONObject()
+                .put("website", Polls.UMAMI_WEBSITE_ID)
+                .put("hostname", Polls.UMAMI_HOSTNAME)
+                .put("name", name)
+                .put("data", data)
+            val envelope = JSONObject().put("payload", payload).put("type", "event")
+
+            client.newCall(
+                Request.Builder()
+                    .url("${Polls.UMAMI_URL}/api/send")
+                    // Umami drops requests with no proper User-Agent, and it also derives its own
+                    // visitor figure from a hash of this and the address. A fixed string is used on
+                    // purpose: nothing here varies by device, so nothing here identifies a device.
+                    .header("User-Agent", USER_AGENT)
+                    .post(envelope.toString().toRequestBody(JSON))
+                    .build()
+            ).execute().use { response ->
+                // Check the code, not just whether the call threw. Umami answers a rejected event
+                // with a normal HTTP error and no exception, so without this an answer that was
+                // refused looked exactly like one that landed, and the only symptom was an empty
+                // dashboard.
+                if (!response.isSuccessful) {
+                    Log.w(
+                        TAG,
+                        "Umami refused $name: HTTP ${response.code} ${
+                            response.body?.string()?.take(200)
+                        }"
+                    )
+                } else {
+                    Log.i(TAG, "$name accepted by Umami")
+                }
+                response.isSuccessful
+            }
+        }.onFailure {
+            Log.w(TAG, "$name could not be sent, recorded locally anyway: ${ErrorText.withoutAddresses(it.toString())}")
+        }
+    }
+
+    /** The banner's close button. Not answered, but not to be raised again either. */
+    suspend fun dismiss(pollId: String) {
+        context.dataStore.edit {
+            it[DismissedPollIdsKey] = it[DismissedPollIdsKey].orEmpty() + pollId
+        }
+        _current.value = null
+    }
+
+    private suspend fun markAnswered(pollId: String) {
+        context.dataStore.edit {
+            it[AnsweredPollIdsKey] = it[AnsweredPollIdsKey].orEmpty() + pollId
+        }
+        _current.value = null
+    }
+
+    /** Forgets every local record, so the settings screen can offer a way to be asked again. */
+    suspend fun forgetAll() {
+        context.dataStore.edit {
+            it.remove(AnsweredPollIdsKey)
+            it.remove(DismissedPollIdsKey)
+            it.remove(CachedPollsJsonKey)
+            it.remove(LastPollFetchKey)
+            // Announcements too: once read one never came back, even for whoever wanted to look
+            // at it again. What was counted stays counted, so reading it again sends nothing.
+            it.remove(DismissedAnnouncementIdsKey)
+        }
+        _current.value = null
+    }
+
+    companion object {
+        private const val TAG = "PollChecker"
+
+        /** The stand-in document's name in the app's files: see standIn. */
+        private const val STAND_IN = "poll-stand-in.json"
+
+        /**
+         * What one answer sends, every key of it: the question and its id, the labels and the ids
+         * picked, the app version, and the words typed for an "Other". A follow-up's picks are in
+         * answer_id only, as "<optionId>/<followUpOptionId>"; the labels stay the first question's, so
+         * its counts read the same in every build. Anything that is not a choice of this poll is left out.
+         */
+        internal fun answerData(poll: Poll, optionIds: List<String>, otherText: String?, version: String): Map<String, String> {
+            val first = optionIds.filter { id -> poll.options.any { it.id == id } }.distinct()
+            val ids = first + optionIds.filter { PollFollowUps.isPick(poll, first, it) }.distinct()
+            return linkedMapOf<String, String>().apply {
+                // Readable first, because this is what the dashboard shows in a column and
+                // "widget-2026-09" tells you nothing months later. The ids are sent too:
+                // they are the stable key, they survive rewording a question, and grouping
+                // on the text would split the moment a typo is fixed.
+                put("poll", poll.question.take(MAX_PROPERTY_CHARS))
+                put("poll_id", poll.id)
+                put(
+                    "answer",
+                    first.mapNotNull { id -> poll.options.firstOrNull { it.id == id }?.label }
+                        .sorted()
+                        .joinToString(", ")
+                        .take(MAX_PROPERTY_CHARS)
+                )
+                put("answer_id", ids.sorted().joinToString(","))
+                put("version", version)
+                // The words typed for an "Other" choice, as they were written.
+                otherText?.trim()?.takeIf { it.isNotEmpty() }?.let { put("text", it.take(MAX_PROPERTY_CHARS)) }
+            }
+        }
+
+        /**
+         * Polls change far less often than releases, so this floor is much higher than the update
+         * checker's. It is a gist behind a CDN, but there is no reason to ask more than this.
+         */
+        private const val MIN_FETCH_INTERVAL_MS = 6 * 60 * 60 * 1000L
+
+        private val JSON = "application/json; charset=utf-8".toMediaType()
+
+        /** Fixed on purpose. See the note where it is used. */
+        /**
+         * Umami runs bot detection over this and silently discards anything that does not look
+         * like a browser, while still answering 200. "InterTune" was dropped every time: the app
+         * reported success, the answer was recorded locally, and nothing ever reached the
+         * dashboard. It has to read as a browser to be counted.
+         *
+         * Fixed on purpose, and deliberately not built from the real device. Umami derives its
+         * visitor figure from a hash of this and the address, so a constant means every install
+         * looks identical here and nothing in it identifies anybody.
+         */
+        /** Umami truncates long property values; keep well inside it rather than find out. */
+        private const val MAX_PROPERTY_CHARS = Polls.MAX_TEXT_CHARS
+
+        private const val USER_AGENT =
+            "Mozilla/5.0 (Linux; Android 13) AppleWebKit/537.36 (KHTML, like Gecko) " +
+                    "Chrome/120.0.0.0 Mobile Safari/537.36"
+    }
+}

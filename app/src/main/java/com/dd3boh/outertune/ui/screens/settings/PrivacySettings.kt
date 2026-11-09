@@ -1,0 +1,194 @@
+/*
+ * Copyright (C) 2026 InterTune
+ *
+ * SPDX-License-Identifier: GPL-3.0
+ *
+ * For any other attributions, refer to the git commit history
+ */
+package com.dd3boh.outertune.ui.screens.settings
+
+import androidx.compose.material.icons.rounded.RestartAlt
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
+import androidx.compose.ui.platform.LocalContext
+import com.dd3boh.outertune.ui.component.PreferenceEntry
+import com.dd3boh.outertune.utils.ProxyAddress
+import com.dd3boh.outertune.utils.ProxyAtStart
+import com.dd3boh.outertune.utils.dataStore
+import kotlinx.coroutines.flow.map
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.Lan
+import androidx.compose.material3.ElevatedCard
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.Icon
+import androidx.compose.material3.Text
+import androidx.compose.material3.TopAppBarScrollBehavior
+import androidx.compose.runtime.Composable
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.unit.dp
+import androidx.navigation.NavController
+import com.dd3boh.outertune.R
+import com.dd3boh.outertune.constants.ProxyEnabledKey
+import com.dd3boh.outertune.constants.ProxyTypeKey
+import com.dd3boh.outertune.constants.ProxyUrlKey
+import com.dd3boh.outertune.ui.component.ColumnWithContentPadding
+import com.dd3boh.outertune.ui.component.EditTextPreference
+import com.dd3boh.outertune.ui.component.FloatingTopBar
+import com.dd3boh.outertune.ui.dialog.InfoLabel
+import com.dd3boh.outertune.ui.component.ListPreference
+import com.dd3boh.outertune.ui.component.PreferenceGroupTitle
+import com.dd3boh.outertune.ui.component.SettingsClickToReveal
+import com.dd3boh.outertune.ui.component.SwitchPreference
+import com.dd3boh.outertune.ui.screens.settings.fragments.ListenHistoryFrag
+import com.dd3boh.outertune.ui.screens.settings.fragments.PollsFrag
+import com.dd3boh.outertune.ui.screens.settings.fragments.UsageCountFrag
+import com.dd3boh.outertune.ui.screens.settings.fragments.SearchHistoryFrag
+import com.dd3boh.outertune.utils.rememberEnumPreference
+import com.dd3boh.outertune.utils.rememberPreference
+import java.net.Proxy
+
+/**
+ * Everything about what the app keeps and what it sends.
+ *
+ * These rows were spread over four screens, two of them behind a collapsed Advanced reveal: what
+ * goes into your listening history was under Library and content, how much of a song counts was
+ * under Player and audio, the proxy was under Library and content > Advanced, and the occasional
+ * question had a whole screen of its own. Nobody looking for "what does this app record about me"
+ * would have found the set of them.
+ */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun PrivacySettings(
+    navController: NavController,
+    scrollBehavior: TopAppBarScrollBehavior,
+) {
+    val (proxyEnabled, onProxyEnabledChange) = rememberPreference(key = ProxyEnabledKey, defaultValue = false)
+    val (proxyType, onProxyTypeChange) = rememberEnumPreference(key = ProxyTypeKey, defaultValue = Proxy.Type.HTTP)
+    // Nothing until an address is typed: "host:port" was shown as if it were one.
+    val (proxyUrl, onProxyUrlChange) = rememberPreference(key = ProxyUrlKey, defaultValue = "")
+
+    ColumnWithContentPadding(
+        modifier = Modifier.fillMaxHeight(),
+        columnModifier = Modifier
+            .padding(horizontal = 16.dp)
+    ) {
+        PreferenceGroupTitle(
+            title = stringResource(R.string.grp_listen_history)
+        )
+
+        ElevatedCard(
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            ListenHistoryFrag()
+        }
+        Spacer(modifier = Modifier.height(16.dp))
+
+        PreferenceGroupTitle(
+            title = stringResource(R.string.grp_search_history)
+        )
+
+        ElevatedCard(
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            SearchHistoryFrag()
+        }
+        Spacer(modifier = Modifier.height(16.dp))
+
+        PreferenceGroupTitle(
+            title = stringResource(R.string.grp_polls)
+        )
+
+        ElevatedCard(
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            PollsFrag()
+        }
+
+        Spacer(modifier = Modifier.height(16.dp))
+
+        PreferenceGroupTitle(
+            title = stringResource(R.string.grp_usage_count)
+        )
+
+        ElevatedCard(
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            UsageCountFrag()
+        }
+
+        SettingsClickToReveal(stringResource(R.string.advanced)) {
+            ElevatedCard(
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                SwitchPreference(
+                    modifier = Modifier.settingRow(R.string.enable_proxy),
+                    title = { Text(stringResource(R.string.enable_proxy)) },
+                    description = stringResource(R.string.enable_proxy_description),
+                    icon = { Icon(Icons.Rounded.Lan, null) },
+                    checked = proxyEnabled,
+                    onCheckedChange = onProxyEnabledChange
+                )
+
+                AnimatedVisibility(proxyEnabled) {
+                    Column {
+                        ListPreference(
+                            modifier = Modifier.settingRow(R.string.proxy_type),
+                            title = { Text(stringResource(R.string.proxy_type)) },
+                            selectedValue = proxyType,
+                            values = listOf(Proxy.Type.HTTP, Proxy.Type.SOCKS),
+                            valueText = { it.name },
+                            onValueSelected = onProxyTypeChange
+                        )
+                        // Only an address the start can use is taken (ProxyAddress), and the dialog
+                        // says why OK stays grey. The field took anything, and an address the start
+                        // could not read left the app without the proxy.
+                        val addressFormat = stringResource(R.string.proxy_address_format)
+                        EditTextPreference(
+                            modifier = Modifier.settingRow(R.string.proxy_url),
+                            title = { Text(stringResource(R.string.proxy_url)) },
+                            value = proxyUrl,
+                            onValueChange = onProxyUrlChange,
+                            isInputValid = { ProxyAddress.parse(it) != null },
+                            inputHint = { typed -> addressFormat.takeIf { ProxyAddress.parse(typed) == null } },
+                        )
+                        // On with no address it can use, none typed included: what was a toast at
+                        // the next start, said here.
+                        if (ProxyAddress.parse(proxyUrl) == null) {
+                            InfoLabel(stringResource(R.string.proxy_address_missing), isError = true)
+                        }
+                        // Nobody who needs this has a proxy address to hand, and a field reading
+                        // "host:port" tells them nothing about where one comes from.
+                        InfoLabel(stringResource(R.string.proxy_examples))
+                    }
+                }
+
+                // The proxy is taken when the app starts, so a change here waits for a restart.
+                // Nothing said so, and a proxy typed in looked like it did nothing (#68).
+                val context = LocalContext.current
+                val proxyNow by remember(context) {
+                    context.dataStore.data.map { ProxyAtStart.of(it[ProxyEnabledKey], it[ProxyTypeKey], it[ProxyUrlKey]) }
+                }.collectAsState(initial = ProxyAtStart.setting)
+                AnimatedVisibility(ProxyAtStart.setting != null && proxyNow != ProxyAtStart.setting) {
+                    PreferenceEntry(
+                        modifier = Modifier.settingRow(R.string.proxy_restart_title),
+                        title = { Text(stringResource(R.string.proxy_restart_title)) },
+                        description = stringResource(R.string.proxy_restart_description),
+                        icon = { Icon(Icons.Rounded.RestartAlt, null) },
+                        onClick = { ProxyAtStart.restart(context) },
+                    )
+                }
+            }
+        }
+    }
+
+    FloatingTopBar(title = stringResource(R.string.grp_privacy_and_history), navController = navController)
+}

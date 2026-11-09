@@ -1,0 +1,972 @@
+/*
+ * Copyright (C) 2024 z-huang/InnerTune
+ * Copyright (C) 2025 O‌ute‌rTu‌ne Project
+ *
+ * SPDX-License-Identifier: GPL-3.0
+ *
+ * For any other attributions, refer to the git commit history
+ */
+
+package com.dd3boh.outertune.ui.component.items
+
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.expandIn
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkOut
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxScope
+import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.layout.BoxWithConstraintsScope
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.RowScope
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.aspectRatio
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.rounded.PlaylistAdd
+import androidx.compose.material.icons.automirrored.rounded.PlaylistPlay
+import androidx.compose.material.icons.automirrored.rounded.QueueMusic
+import androidx.compose.material.icons.rounded.CloudOff
+import androidx.compose.material.icons.rounded.Error
+import androidx.compose.material.icons.rounded.Explicit
+import androidx.compose.material.icons.rounded.AutoAwesome
+import androidx.compose.material.icons.rounded.Favorite
+import androidx.compose.material.icons.rounded.FolderCopy
+import androidx.compose.material.icons.rounded.LibraryAddCheck
+import androidx.compose.material.icons.rounded.MusicNote
+import androidx.compose.material.icons.rounded.OfflinePin
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
+import androidx.compose.material3.surfaceColorAtElevation
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
+import androidx.compose.runtime.remember
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Shape
+import androidx.compose.ui.graphics.StrokeJoin
+import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.res.pluralStringResource
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import androidx.media3.exoplayer.offline.Download.STATE_COMPLETED
+import androidx.media3.exoplayer.offline.Download.STATE_DOWNLOADING
+import androidx.media3.exoplayer.offline.Download.STATE_QUEUED
+import coil3.compose.AsyncImage
+import coil3.imageLoader
+import com.dd3boh.outertune.constants.PlayOrigin
+import com.dd3boh.outertune.LocalDatabase
+import com.dd3boh.outertune.LocalDownloadUtil
+import com.dd3boh.outertune.LocalPlayerConnection
+import com.dd3boh.outertune.R
+import com.dd3boh.outertune.constants.GridThumbnailHeight
+import com.dd3boh.outertune.constants.ListItemHeight
+import com.dd3boh.outertune.constants.ListThumbnailSize
+import com.dd3boh.outertune.constants.ThumbnailCornerRadius
+import com.dd3boh.outertune.db.entities.PlaylistEntity
+import com.dd3boh.outertune.db.entities.RecentActivityEntity
+import com.dd3boh.outertune.models.MediaMetadata
+import com.dd3boh.outertune.models.MultiQueueObject
+import com.dd3boh.outertune.playback.queues.ListQueue
+import com.dd3boh.outertune.ui.component.PlayingIndicator
+import com.dd3boh.outertune.ui.component.PlayingIndicatorBox
+import com.dd3boh.outertune.ui.utils.SameTextSize
+import com.dd3boh.outertune.ui.utils.canWrap
+import com.dd3boh.outertune.ui.utils.shrinkToFit
+import com.dd3boh.outertune.ui.utils.dpadFocusIndicator
+import com.dd3boh.outertune.utils.LocalArtworkPath
+import com.dd3boh.outertune.utils.albumSongsToPlay
+import com.dd3boh.outertune.utils.getDownloadState
+import com.dd3boh.outertune.utils.joinByBullet
+import com.dd3boh.outertune.utils.makeTimeString
+import com.zionhuang.innertube.models.AlbumItem
+import com.zionhuang.innertube.models.ArtistItem
+import com.zionhuang.innertube.models.PlaylistItem
+import com.zionhuang.innertube.models.SongItem
+import com.zionhuang.innertube.models.YTItem
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import java.time.LocalDateTime
+import kotlinx.coroutines.flow.flowOf
+
+const val ActiveBoxAlpha = 0.6f
+
+// Basic list item
+@Composable
+inline fun ListItem(
+    modifier: Modifier = Modifier,
+    title: String,
+    noinline subtitle: (@Composable RowScope.() -> Unit)? = null,
+    thumbnailContent: @Composable () -> Unit,
+    trailingContent: @Composable RowScope.() -> Unit = {},
+    isSelected: Boolean? = false,
+    isActive: Boolean = false,
+    isAvailable: Boolean = true,
+) {
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        modifier = if (isActive) {
+            modifier // playing highlight
+                .height(ListItemHeight)
+                .padding(horizontal = 8.dp)
+                .clip(RoundedCornerShape(8.dp))
+                .background(
+                    color = // selected active
+                        if (isSelected == true) MaterialTheme.colorScheme.primary.copy(alpha = 0.4f)
+                        else MaterialTheme.colorScheme.secondaryContainer
+                )
+                .dpadFocusIndicator(RoundedCornerShape(8.dp))
+        } else if (isSelected == true) {
+            modifier // inactive selected
+                .height(ListItemHeight)
+                .padding(horizontal = 8.dp)
+                .clip(RoundedCornerShape(8.dp))
+                .background(color = MaterialTheme.colorScheme.inversePrimary.copy(alpha = 0.4f))
+                .dpadFocusIndicator(RoundedCornerShape(8.dp))
+        } else {
+            modifier // default
+                .height(ListItemHeight)
+                .padding(horizontal = 8.dp)
+                .dpadFocusIndicator(RoundedCornerShape(8.dp))
+        }
+    ) {
+        Box(
+            modifier = Modifier.padding(6.dp),
+            contentAlignment = Alignment.Center
+        ) {
+            thumbnailContent()
+            if (!isAvailable) {
+                Box(
+                    modifier = Modifier
+                        .size(ListThumbnailSize) // Adjust size as needed
+                        .align(Alignment.Center)
+                        .background(
+                            Color.Black.copy(alpha = 0.25f),
+                            RoundedCornerShape(ThumbnailCornerRadius)
+                        )
+                ) {
+                    Icon(
+                        imageVector = Icons.Rounded.CloudOff,
+                        contentDescription = null,
+                        tint = Color.White,
+                        modifier = Modifier
+                            .size(ListThumbnailSize / 2)
+                            .align(Alignment.Center)
+                            .graphicsLayer { alpha = 1f }
+                    )
+                }
+            }
+        }
+        Column(
+            modifier = Modifier
+                .weight(1f)
+                .padding(horizontal = 6.dp)
+        ) {
+            Text(
+                text = title,
+                style = MaterialTheme.typography.bodyMedium,
+                fontWeight = FontWeight.Bold,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+
+            if (subtitle != null) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    subtitle()
+                }
+            }
+        }
+
+        trailingContent()
+    }
+}
+
+// merge badges and subtitle text and pass to basic list item
+@Composable
+fun ListItem(
+    modifier: Modifier = Modifier,
+    title: String,
+    subtitle: String?,
+    badges: @Composable RowScope.() -> Unit = {},
+    thumbnailContent: @Composable () -> Unit,
+    trailingContent: @Composable RowScope.() -> Unit = {},
+    isSelected: Boolean? = false,
+    isActive: Boolean = false,
+) = ListItem(
+    title = title,
+    subtitle = {
+        badges()
+
+        if (!subtitle.isNullOrEmpty()) {
+            Text(
+                text = subtitle,
+                color = MaterialTheme.colorScheme.secondary,
+                style = MaterialTheme.typography.bodySmall,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+        }
+    },
+    thumbnailContent = thumbnailContent,
+    trailingContent = trailingContent,
+    modifier = modifier,
+    isSelected = isSelected,
+    isActive = isActive
+)
+
+@Composable
+fun GridItem(
+    modifier: Modifier = Modifier,
+    title: @Composable () -> Unit,
+    subtitle: @Composable () -> Unit,
+    badges: @Composable RowScope.() -> Unit = {},
+    thumbnailContent: @Composable BoxWithConstraintsScope.() -> Unit,
+    thumbnailRatio: Float = 1f,
+    fillMaxWidth: Boolean = false,
+) {
+    Column(
+        modifier = if (fillMaxWidth) {
+            modifier
+                .padding(12.dp)
+                .fillMaxWidth()
+                .dpadFocusIndicator(RoundedCornerShape(12.dp))
+        } else {
+            modifier
+                .padding(12.dp)
+                .width(GridThumbnailHeight * thumbnailRatio)
+                .dpadFocusIndicator(RoundedCornerShape(12.dp))
+        }
+    ) {
+        BoxWithConstraints(
+            modifier = if (fillMaxWidth) {
+                Modifier.fillMaxWidth()
+            } else {
+                Modifier.height(GridThumbnailHeight)
+            }
+                .aspectRatio(thumbnailRatio)
+        ) {
+            thumbnailContent()
+        }
+
+        Spacer(modifier = Modifier.height(6.dp))
+
+        title()
+
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            badges()
+
+            subtitle()
+        }
+    }
+}
+
+/**
+ * [shrinks] is for a tile whose two texts are the app's own words, as an automatic playlist's
+ * are. They get smaller, down to three quarters of their size, before a word is broken or the
+ * end is cut, and the line under the title may take a third line. In German "Heruntergeladene
+ * Songs" was broken after "Heruntergelad", and in Spanish "Lista de reproducción automática"
+ * ended at "a…". A name (a playlist's, an album's) is cut at its full size, as names are
+ * everywhere else.
+ *
+ * [titleSize] is for such tiles side by side: handed the same one, their titles all take the
+ * size of the one that needs the smallest.
+ */
+@Composable
+fun GridItem(
+    modifier: Modifier = Modifier,
+    title: String,
+    subtitle: String,
+    badges: @Composable RowScope.() -> Unit = {},
+    thumbnailContent: @Composable BoxWithConstraintsScope.() -> Unit,
+    thumbnailRatio: Float = 1f,
+    fillMaxWidth: Boolean = false,
+    shrinks: Boolean = false,
+    titleSize: SameTextSize? = null,
+) = GridItem(
+    modifier = modifier,
+    title = {
+        val style = MaterialTheme.typography.bodyMedium
+        // A title of one word has nowhere to wrap: still too wide at its smallest, it is cut.
+        val oneWord = remember(title) { !canWrap(title) }
+        val autoSize = when {
+            !shrinks -> null
+            titleSize == null -> style.shrinkToFit(smallest = 10.5.sp)
+            else -> style.shrinkToFit(smallest = 10.5.sp, text = title, row = titleSize)
+        }
+        // Made again for each new autoSize: a Text does not see that one changed (see shrinkToFit).
+        key(autoSize) {
+            Text(
+                text = title,
+                style = style,
+                fontWeight = FontWeight.Bold,
+                autoSize = autoSize,
+                maxLines = if (shrinks && oneWord) 1 else 2,
+                overflow = TextOverflow.Ellipsis,
+                textAlign = TextAlign.Start,
+                modifier = Modifier.fillMaxWidth()
+            )
+        }
+    },
+    subtitle = {
+        Row {
+            badges()
+        }
+
+        val style = MaterialTheme.typography.bodySmall
+        Text(
+            text = subtitle,
+            style = style,
+            color = MaterialTheme.colorScheme.secondary,
+            autoSize = if (shrinks) style.shrinkToFit(smallest = 9.sp) else null,
+            maxLines = if (shrinks) 3 else 2,
+            overflow = TextOverflow.Ellipsis,
+        )
+    },
+    thumbnailContent = thumbnailContent,
+    thumbnailRatio = thumbnailRatio,
+    fillMaxWidth = fillMaxWidth
+)
+
+@Composable
+fun MediaMetadataListItem(
+    mediaMetadata: MediaMetadata,
+    modifier: Modifier,
+    isActive: Boolean = false,
+    isSelected: Boolean? = false,
+    isPlaying: Boolean = false,
+    showLikedIcon: Boolean = true,
+    showInLibraryIcon: Boolean = true,
+    showDownloadIcon: Boolean = true,
+    preferredSize: Int,
+    /** A song the adaptive queue put in that has not played yet: a small mark first among the badges. */
+    isNew: Boolean = false,
+    trailingContent: @Composable RowScope.() -> Unit = {},
+) = ListItem(
+    title = mediaMetadata.title,
+    subtitle = joinByBullet(
+        mediaMetadata.artists.joinToString { it.name },
+        makeTimeString(mediaMetadata.duration * 1000L)
+    ),
+    badges = {
+        // In the subtitle's line, where the heart and the library marks are, so the thumbnail, the
+        // title, the menu and the drag handle stay where they always are.
+        if (isNew) {
+            Icon.NewPick()
+        }
+        if (showLikedIcon && mediaMetadata.liked) {
+            Icon.Favorite()
+        }
+        if (showInLibraryIcon && mediaMetadata.isLocal) {
+            Icon.FolderCopy()
+        } else if (showInLibraryIcon && mediaMetadata.inLibrary != null) {
+            Icon.Library()
+        }
+        if (showDownloadIcon && !mediaMetadata.isLocal) {
+            // Kept for the row. getDownload makes a new flow at each call, and with a new one each
+            // time the row was composed, its watch on the download started over every time.
+            val downloadUtil = LocalDownloadUtil.current
+            val download by remember(mediaMetadata.id) { downloadUtil.getDownload(mediaMetadata.id) }.collectAsState(initial = null)
+            Icon.Download(download)
+        }
+    },
+    thumbnailContent = {
+        ItemThumbnail(
+            thumbnailUrl = mediaMetadata.thumbnailUrl,
+            preferredSize = preferredSize,
+            isActive = isActive,
+            isPlaying = isPlaying,
+            shape = RoundedCornerShape(ThumbnailCornerRadius),
+            modifier = Modifier.size(ListThumbnailSize)
+        )
+    },
+    trailingContent = trailingContent,
+    modifier = modifier,
+    isSelected = isSelected,
+    isActive = isActive,
+)
+
+@Composable
+fun QueueListItem(
+    queue: MultiQueueObject,
+    modifier: Modifier = Modifier,
+    number: Int? = null,
+) = ListItem(
+    title = (if (number != null) "$number. " else "") + (queue.title ?: "Queue"),
+    subtitle = joinByBullet(
+        pluralStringResource(
+            R.plurals.n_song,
+            queue.getCurrentQueueShuffled().size,
+            queue.getCurrentQueueShuffled().size
+        ),
+        makeTimeString(queue.getDuration() * 1000L)
+    ),
+    thumbnailContent = {
+        Icon(
+            Icons.AutoMirrored.Rounded.QueueMusic,
+            contentDescription = null,
+            modifier = Modifier.size(48.dp)
+        )
+    },
+    modifier = modifier
+)
+
+@Composable
+fun YouTubeListItem(
+    item: YTItem,
+    modifier: Modifier = Modifier,
+    albumIndex: Int? = null,
+    isSelected: Boolean = false,
+    badges: @Composable RowScope.() -> Unit = {
+        val database = LocalDatabase.current
+        // Each kind of item asks its own table and no other: a song its song, an album its album.
+        // Every item asked both, whatever it was, so a list of artists or playlists kept two
+        // queries open for each row, run again at every change to either table.
+        val song by remember(item.id) { if (item is SongItem) database.song(item.id) else flowOf(null) }.collectAsState(initial = null)
+        val album by remember(item.id) { if (item is AlbumItem) database.album(item.id) else flowOf(null) }.collectAsState(initial = null)
+
+        if (item is SongItem && song?.song?.liked == true ||
+            item is AlbumItem && album?.album?.bookmarkedAt != null
+        ) {
+            Icon.Favorite()
+        }
+        if (item.explicit) {
+            Icon.Explicit()
+        }
+        if (item is SongItem && song?.song?.inLibrary != null) {
+            Icon.Library()
+        }
+        if (item is SongItem) {
+            val downloads by LocalDownloadUtil.current.downloads.collectAsState()
+            Icon.Download(downloads[item.id])
+        }
+    },
+    isActive: Boolean = false,
+    isPlaying: Boolean = false,
+    trailingContent: @Composable RowScope.() -> Unit = {},
+) {
+    ListItem(
+        title = item.title,
+        subtitle = when (item) {
+            is SongItem -> joinByBullet(
+                item.artists.joinToString { it.name },
+                makeTimeString(item.duration?.times(1000L))
+            )
+
+            is AlbumItem -> joinByBullet(
+                item.artists?.joinToString { it.name },
+                item.year?.toString()
+            )
+
+            is ArtistItem -> null
+            is PlaylistItem -> joinByBullet(item.author?.name, item.songCountText)
+        },
+        badges = badges,
+        thumbnailContent = {
+            ItemThumbnail(
+                thumbnailUrl = item.thumbnail,
+                albumIndex = albumIndex,
+                isActive = isActive,
+                isPlaying = isPlaying,
+                shape = if (item is ArtistItem) CircleShape else RoundedCornerShape(
+                    ThumbnailCornerRadius
+                ),
+                modifier = Modifier.size(ListThumbnailSize)
+            )
+        },
+        trailingContent = trailingContent,
+        modifier = modifier,
+        isSelected = isSelected,
+        isActive = isActive,
+    )
+}
+
+@Composable
+fun YouTubeGridItem(
+    item: YTItem,
+    modifier: Modifier = Modifier,
+    coroutineScope: CoroutineScope? = null,
+    badges: @Composable RowScope.() -> Unit = {
+        val database = LocalDatabase.current
+        // Each kind of item asks its own table and no other, as YouTubeListItem's do.
+        val song by remember(item.id) { if (item is SongItem) database.song(item.id) else flowOf(null) }.collectAsState(initial = null)
+        val album by remember(item.id) { if (item is AlbumItem) database.album(item.id) else flowOf(null) }.collectAsState(initial = null)
+
+        if (item is SongItem && song?.song?.liked == true ||
+            item is AlbumItem && album?.album?.bookmarkedAt != null
+        ) {
+            Icon.Favorite()
+        }
+        if (item.explicit) {
+            Icon.Explicit()
+        }
+        if (item is SongItem && song?.song?.inLibrary != null) {
+            Icon.Library()
+        }
+        if (item is SongItem) {
+            val downloads by LocalDownloadUtil.current.downloads.collectAsState()
+            Icon.Download(downloads[item.id])
+        }
+    },
+    thumbnailRatio: Float = if (item is SongItem) 16f / 9 else 1f,
+    isActive: Boolean = false,
+    isPlaying: Boolean = false,
+    fillMaxWidth: Boolean = false,
+) = GridItem(
+    title = {
+        Text(
+            text = item.title,
+            style = MaterialTheme.typography.bodyMedium,
+            fontWeight = FontWeight.Bold,
+            maxLines = 2,
+            overflow = TextOverflow.Ellipsis,
+            textAlign = if (item is ArtistItem) TextAlign.Center else TextAlign.Start,
+            modifier = Modifier.fillMaxWidth()
+        )
+    },
+    subtitle = {
+        val subtitle = when (item) {
+            is SongItem -> joinByBullet(
+                item.artists.joinToString { it.name },
+                makeTimeString(item.duration?.times(1000L))
+            )
+
+            is AlbumItem -> joinByBullet(item.artists?.joinToString { it.name }, item.year?.toString())
+            is ArtistItem -> null
+            is PlaylistItem -> joinByBullet(item.author?.name, item.songCountText)
+        }
+
+        if (subtitle != null) {
+            Text(
+                text = subtitle,
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.secondary,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
+    },
+    badges = badges,
+    thumbnailContent = {
+        val database = LocalDatabase.current
+        val playerConnection = LocalPlayerConnection.current ?: return@GridItem
+
+        ItemThumbnail(
+            thumbnailUrl = item.thumbnail,
+            isActive = isActive,
+            isPlaying = isPlaying,
+            shape = if (item is ArtistItem) CircleShape else RoundedCornerShape(ThumbnailCornerRadius),
+        )
+
+        AlbumPlayButton(
+            visible = item is AlbumItem && !isActive,
+            onClick = {
+                coroutineScope?.launch(Dispatchers.IO) {
+                    albumSongsToPlay(database, item.id).takeIf { it.isNotEmpty() }?.let {
+                        withContext(Dispatchers.Main) {
+                            playerConnection.playQueue(
+                                ListQueue(
+                                    title = item.title,
+                                    items = it
+                                ),
+                                // The button only shows on an album.
+                                origin = PlayOrigin.ALBUM,
+                            )
+                        }
+                    }
+                }
+            }
+        )
+    },
+    thumbnailRatio = thumbnailRatio,
+    fillMaxWidth = fillMaxWidth,
+    modifier = modifier
+)
+
+@Composable
+fun YouTubeCardItem(
+    item: RecentActivityEntity,
+    modifier: Modifier = Modifier,
+    isActive: Boolean,
+    isPlaying: Boolean,
+    onClick: () -> Unit,
+) {
+    val configuration = LocalConfiguration.current
+    val screenWidthDp = configuration.screenWidthDp
+
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        modifier = modifier
+            .height(60.dp)
+            .width((screenWidthDp.dp - 12.dp) / 2)
+            .padding(6.dp)
+            .clip(RoundedCornerShape(6.dp))
+            .background(MaterialTheme.colorScheme.surfaceColorAtElevation(6.dp))
+            .clickable(onClick = onClick)
+            .dpadFocusIndicator(RoundedCornerShape(6.dp))
+    ) {
+        Box(
+            contentAlignment = Alignment.Center
+        ) {
+            Box(
+                contentAlignment = Alignment.Center,
+                modifier = Modifier.size(ListThumbnailSize)
+            ) {
+                val thumbnailShape = RoundedCornerShape(ThumbnailCornerRadius)
+                val thumbnailRatio = 1f
+
+                AsyncImage(
+                    model = item.thumbnail,
+                    contentDescription = null,
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .aspectRatio(thumbnailRatio)
+                        .clip(thumbnailShape)
+                )
+            }
+        }
+
+        Column(
+            modifier = Modifier
+                .weight(1f)
+                .padding(horizontal = 8.dp)
+        ) {
+            Text(
+                text = item.title,
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurface,
+                fontWeight = FontWeight.Bold,
+                textAlign = TextAlign.Start,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis
+            )
+        }
+
+        AnimatedVisibility(
+            visible = isActive,
+            enter = fadeIn(tween(500)),
+            exit = fadeOut(tween(500))
+        ) {
+            Box(
+                contentAlignment = Alignment.Center,
+                modifier = Modifier
+                    .padding(8.dp)
+                    .background(
+                        color = Color.Transparent,
+                        shape = RoundedCornerShape(ThumbnailCornerRadius)
+                    )
+                    .size(20.dp)
+            ) {
+                PlayingIndicator(
+                    color = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.height(18.dp),
+                    barWidth = 3.dp,
+                    isPlaying = isPlaying
+                )
+            }
+        }
+    }
+}
+
+@Composable
+fun ItemThumbnail(
+    thumbnailUrl: String?,
+    preferredSize: Int = -1,
+    placeholderIcon: ImageVector = Icons.Rounded.MusicNote,
+    isActive: Boolean,
+    isPlaying: Boolean,
+    shape: Shape,
+    modifier: Modifier = Modifier,
+    albumIndex: Int? = null,
+) {
+    val context = LocalContext.current
+
+    val content: @Composable (artSize: Int) -> Unit = { artSize ->
+        AsyncImage(
+            imageLoader = context.imageLoader,
+            model = if (thumbnailUrl?.startsWith("/storage") == true) {
+                LocalArtworkPath(thumbnailUrl, artSize, artSize)
+            } else {
+                thumbnailUrl
+            },
+//            placeholder = rememberVectorPainter(placeholderIcon),
+            contentDescription = null,
+            modifier = Modifier
+                .fillMaxSize()
+                .clip(shape)
+        )
+
+        if (albumIndex != null) {
+            AnimatedVisibility(
+                visible = !isActive,
+                enter = fadeIn() + expandIn(expandFrom = Alignment.Center),
+                exit = shrinkOut(shrinkTowards = Alignment.Center) + fadeOut()
+            ) {
+                Box(
+                    contentAlignment = Alignment.Center,
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .clip(shape)
+                        .background(MaterialTheme.colorScheme.surfaceContainerHigh.copy(0.6f))
+                ) {
+                    Box {
+                        Text(
+                            text = albumIndex.toString(),
+                            color = MaterialTheme.colorScheme.surface,
+                            style = MaterialTheme.typography.titleLarge.copy(
+                                drawStyle = Stroke(
+                                    miter = 10f,
+                                    width = 8f,
+                                    join = StrokeJoin.Round
+                                )
+                            ),
+                            fontWeight = FontWeight.Bold,
+                        )
+                        Text(
+                            text = albumIndex.toString(),
+                            color = MaterialTheme.colorScheme.onSurface,
+                            style = MaterialTheme.typography.titleLarge,
+                            fontWeight = FontWeight.Bold,
+                        )
+                    }
+                }
+            }
+        }
+
+        PlayingIndicatorBox(
+            isActive = isActive,
+            playWhenReady = isPlaying,
+            color = Color.White,
+            modifier = Modifier
+                .fillMaxSize()
+                .background(
+                    color = Color.Black.copy(alpha = ActiveBoxAlpha),
+                    shape = shape
+                )
+        )
+    }
+
+    // The size it is drawn at is only wanted for a cover on the phone that no size was asked for:
+    // measured for that alone, and every other thumbnail is a plain Box. A BoxWithConstraints
+    // around each one, a second composition for every row of every list, was for this.
+    if (thumbnailUrl?.startsWith("/storage") == true && preferredSize <= 0) {
+        BoxWithConstraints(
+            contentAlignment = Alignment.Center,
+            modifier = modifier
+        ) {
+            /**
+             * Fall back to the size this thumbnail is actually being drawn at when the caller does not
+             * name one. [AlbumGridItem] and friends did not, so [preferredSize] stayed -1, and
+             * LocalArtworkPathKeyer builds its cache key as "path;x;y" -- meaning every size shared the
+             * single key "path;-1;-1". Coil samples a bitmap down to whichever view asked first, so a
+             * 48dp list row could poison the entry that a 96dp grid cell then upscaled. Sizing the key
+             * per use gives each one its own entry.
+             */
+            content(with(LocalDensity.current) { minOf(maxWidth, maxHeight).roundToPx() })
+        }
+    } else {
+        Box(
+            contentAlignment = Alignment.Center,
+            modifier = modifier
+        ) {
+            content(preferredSize)
+        }
+    }
+}
+
+@Composable
+fun BoxScope.AlbumPlayButton(
+    visible: Boolean,
+    onClick: () -> Unit,
+) {
+    AnimatedVisibility(
+        visible = visible,
+        enter = fadeIn(),
+        exit = fadeOut(),
+        modifier = Modifier
+            .align(Alignment.BottomEnd)
+            .padding(8.dp)
+    ) {
+        Box(
+            contentAlignment = Alignment.Center,
+            modifier = Modifier
+                .size(36.dp)
+                .clip(CircleShape)
+                .background(Color.Black.copy(alpha = ActiveBoxAlpha))
+                .clickable(onClick = onClick)
+                .dpadFocusIndicator(CircleShape)
+        ) {
+            Icon(
+                painter = painterResource(R.drawable.play),
+                contentDescription = null,
+                tint = Color.White
+            )
+        }
+    }
+}
+
+object Icon {
+    /** A song the adaptive queue put in, the adaptive queue's own icon in the secondary colour. */
+    @Composable
+    fun NewPick() {
+        Icon(
+            imageVector = Icons.Rounded.AutoAwesome,
+            contentDescription = stringResource(R.string.adaptive_pick_mark),
+            tint = MaterialTheme.colorScheme.secondary,
+            modifier = Modifier
+                .size(18.dp)
+                .padding(end = 2.dp)
+        )
+    }
+
+    @Composable
+    fun Favorite() {
+        Icon(
+            imageVector = Icons.Rounded.Favorite,
+            contentDescription = null,
+            tint = MaterialTheme.colorScheme.error,
+            modifier = Modifier
+                .size(18.dp)
+                .padding(end = 2.dp)
+        )
+    }
+
+    @Composable
+    fun FolderCopy() {
+        Icon(
+            imageVector = Icons.Rounded.FolderCopy,
+            contentDescription = null,
+            modifier = Modifier
+                .size(18.dp)
+                .padding(end = 2.dp)
+        )
+    }
+
+    @Composable
+    fun Library() {
+        Icon(
+            imageVector = Icons.Rounded.LibraryAddCheck,
+            contentDescription = null,
+            modifier = Modifier
+                .size(18.dp)
+                .padding(end = 2.dp)
+        )
+    }
+
+    @Composable
+    fun PlaylistIcon(playlist: PlaylistEntity) {
+        /**
+         * 8: Local playlist
+         * 4: Synced/editable playlist
+         * 2: Saved remote playlist
+         * 1: Supports endpoints
+         *
+         */
+        var features = 0
+        if (playlist.isLocal) features += 8
+        if (playlist.isEditable) features += 4
+        if (playlist.bookmarkedAt != null) features += 2
+        if ((playlist.playEndpointParams ?: playlist.radioEndpointParams
+            ?: playlist.shuffleEndpointParams) != null
+        ) features += 1
+        Icon(
+            imageVector = when {
+                // TODO: Icons that actually goddamn match with each other wth is this google???
+                features >= 8 -> Icons.AutoMirrored.Rounded.QueueMusic
+                features >= 4 -> Icons.AutoMirrored.Rounded.PlaylistAdd
+                features >= 2 -> Icons.AutoMirrored.Rounded.PlaylistPlay
+                else -> Icons.Rounded.Error
+            },
+            contentDescription = null,
+            modifier = Modifier
+                .size(18.dp)
+                .padding(end = 2.dp)
+        )
+
+    }
+
+    @Composable
+    fun Download(state: Int?) {
+        when (state) {
+            STATE_COMPLETED -> Icon(
+                imageVector = Icons.Rounded.OfflinePin,
+                contentDescription = null,
+                modifier = Modifier
+                    .size(18.dp)
+                    .padding(end = 2.dp)
+            )
+
+            STATE_QUEUED, STATE_DOWNLOADING -> CircularProgressIndicator(
+                strokeWidth = 2.dp,
+                modifier = Modifier
+                    .size(16.dp)
+                    .padding(end = 2.dp)
+            )
+
+            else -> {}
+        }
+    }
+
+    @Composable
+    fun Download(localDateTime: LocalDateTime?) {
+        val state = getDownloadState(localDateTime)
+        when (state) {
+            STATE_COMPLETED -> Icon(
+                imageVector = Icons.Rounded.OfflinePin,
+                contentDescription = null,
+                modifier = Modifier
+                    .size(18.dp)
+                    .padding(end = 2.dp)
+            )
+
+            STATE_QUEUED, STATE_DOWNLOADING -> CircularProgressIndicator(
+                strokeWidth = 2.dp,
+                modifier = Modifier
+                    .size(16.dp)
+                    .padding(end = 2.dp)
+            )
+
+            else -> {}
+        }
+    }
+
+    @Composable
+    fun Explicit() {
+        Icon(
+            imageVector = Icons.Rounded.Explicit,
+            contentDescription = null,
+            modifier = Modifier
+                .size(18.dp)
+                .padding(end = 2.dp)
+        )
+    }
+}

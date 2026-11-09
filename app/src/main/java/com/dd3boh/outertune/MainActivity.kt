@@ -1,0 +1,2756 @@
+/*
+ * Copyright (C) 2024 z-huang/InnerTune
+ * Copyright (C) 2025 O​u​t​er​Tu​ne Project
+ *
+ * SPDX-License-Identifier: GPL-3.0
+ *
+ * For any other attributions, refer to the git commit history
+ */
+
+package com.dd3boh.outertune
+
+import com.dd3boh.outertune.utils.BuiltInKeys
+import com.dd3boh.outertune.recognition.RecognitionShortcut
+import com.dd3boh.outertune.ui.navigation.appDestinations
+import android.annotation.SuppressLint
+import android.app.NotificationManager
+import android.app.StatusBarManager
+import android.app.SearchManager
+import android.content.Intent
+import android.os.Build
+import android.appwidget.AppWidgetManager
+import android.content.ComponentName
+import android.os.Bundle
+import android.os.SystemClock
+import android.view.KeyEvent
+import android.provider.MediaStore
+import android.util.Log
+import android.widget.Toast
+import androidx.media3.common.MediaItem
+import androidx.media3.session.LibraryResult
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.guava.await
+import androidx.activity.ComponentActivity
+import androidx.activity.compose.setContent
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.activity.viewModels
+import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideOutHorizontally
+import androidx.compose.foundation.Image
+import androidx.compose.foundation.background
+import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.WindowInsetsSides
+import androidx.compose.foundation.layout.add
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.displayCutout
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.offset
+import androidx.compose.foundation.layout.only
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.systemBars
+import androidx.compose.foundation.layout.systemBarsIgnoringVisibility
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.windowInsetsPadding
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.Icon
+import androidx.compose.material3.LocalContentColor
+import androidx.compose.material3.LocalTextStyle
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.NavigationBar
+import androidx.compose.material3.NavigationBarItem
+import androidx.compose.material3.NavigationRail
+import androidx.compose.material3.NavigationRailItem
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
+import androidx.datastore.preferences.core.edit
+import com.dd3boh.outertune.constants.Unreleased
+import com.dd3boh.outertune.constants.UpdateCheckEnabledKey
+import com.dd3boh.outertune.constants.UsageCountEnabledKey
+import com.dd3boh.outertune.utils.dataStore
+import androidx.compose.material3.Text
+import androidx.compose.material3.adaptive.currentWindowAdaptiveInfo
+import androidx.compose.material3.contentColorFor
+import androidx.compose.material3.rememberModalBottomSheetState
+import androidx.compose.material3.surfaceColorAtElevation
+import androidx.compose.runtime.Composable
+import com.dd3boh.outertune.constants.PlayOrigin
+import com.dd3boh.outertune.models.MediaMetadata
+import com.dd3boh.outertune.models.toMediaMetadata
+import com.dd3boh.outertune.playback.queues.YouTubeQueue
+import androidx.lifecycle.lifecycleScope
+import com.dd3boh.outertune.constants.SongSortDescendingKey
+import com.dd3boh.outertune.constants.SongSortType
+import com.dd3boh.outertune.constants.SongSortTypeKey
+import com.dd3boh.outertune.extensions.toEnum
+import com.dd3boh.outertune.playback.queues.ListQueue
+import kotlinx.coroutines.flow.filterNotNull
+import com.dd3boh.outertune.widget.WidgetCommands
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.withContext
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
+import kotlinx.coroutines.flow.distinctUntilChanged
+import androidx.compose.material3.TopAppBarState
+import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.runtime.snapshotFlow
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.compositionLocalOf
+import androidx.compose.runtime.derivedStateOf
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.mutableLongStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.staticCompositionLocalOf
+import androidx.compose.runtime.withFrameNanos
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.toArgb
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.input.nestedscroll.nestedScroll
+import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.platform.LocalLayoutDirection
+import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.IntOffset
+import androidx.compose.ui.unit.LayoutDirection
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import androidx.compose.ui.util.fastForEach
+import androidx.core.net.toUri
+import androidx.core.view.WindowCompat
+import androidx.core.view.ViewCompat
+import androidx.core.view.WindowInsetsCompat
+import androidx.core.view.WindowInsetsControllerCompat
+import androidx.navigation.NavBackStackEntry
+import androidx.navigation.NavController
+import androidx.navigation.NavHostController
+import androidx.navigation.NavDestination.Companion.hierarchy
+import androidx.navigation.compose.NavHost
+import androidx.navigation.compose.currentBackStackEntryAsState
+import androidx.navigation.compose.rememberNavController
+import androidx.window.core.layout.WindowHeightSizeClass
+import androidx.window.core.layout.WindowWidthSizeClass
+import coil3.imageLoader
+import coil3.request.ImageRequest
+import coil3.request.allowHardware
+import coil3.toBitmap
+import com.dd3boh.outertune.constants.AppBarHeight
+import com.dd3boh.outertune.constants.BackAnimationsKey
+import com.dd3boh.outertune.constants.DEFAULT_ENABLED_TABS
+import com.dd3boh.outertune.constants.DarkMode
+import com.dd3boh.outertune.constants.DarkModeKey
+import com.dd3boh.outertune.constants.DefaultOpenTabKey
+import com.dd3boh.outertune.constants.DynamicThemeKey
+import com.dd3boh.outertune.constants.EnabledTabsKey
+import com.dd3boh.outertune.constants.HighContrastKey
+import com.dd3boh.outertune.constants.LibraryFilterKey
+import com.dd3boh.outertune.constants.MinMiniPlayerHeight
+import com.dd3boh.outertune.constants.MiniPlayerHeight
+import com.dd3boh.outertune.constants.NavigationBarAnimationSpec
+import com.dd3boh.outertune.constants.NavigationBarHeight
+import com.dd3boh.outertune.constants.AccountNoticeSeenKey
+import com.dd3boh.outertune.constants.InnerTubeCookieKey
+import com.dd3boh.outertune.constants.OOBE_VERSION
+import com.dd3boh.outertune.constants.OobeStatusKey
+import com.dd3boh.outertune.constants.AnnouncementsEnabledKey
+import com.dd3boh.outertune.constants.PollsEnabledKey
+import com.dd3boh.outertune.constants.PureBlackKey
+import com.dd3boh.outertune.constants.QuickPicksSource
+import com.dd3boh.outertune.constants.QuickPicksSourceKey
+import com.dd3boh.outertune.constants.hasChips
+import com.dd3boh.outertune.constants.orOffered
+import com.dd3boh.outertune.constants.SlimNavBarKey
+import com.dd3boh.outertune.db.MusicDatabase
+import com.dd3boh.outertune.playback.BatteryUse
+import com.dd3boh.outertune.playback.DownloadUtil
+import com.dd3boh.outertune.playback.DownloadsShortcut
+import com.dd3boh.outertune.playback.MediaControllerViewModel
+import com.dd3boh.outertune.playback.MusicService
+import com.dd3boh.outertune.playback.PlayerConnection
+import com.dd3boh.outertune.search.SystemSearch
+import com.dd3boh.outertune.utils.YouTubeLink
+import com.dd3boh.outertune.utils.urlEncode
+import com.dd3boh.outertune.ui.component.LocalHiddenByPlayer
+import com.dd3boh.outertune.ui.component.LocalPlayerSheet
+import com.dd3boh.outertune.ui.component.rememberBottomSheetState
+import com.dd3boh.outertune.ui.component.shimmer.ShimmerTheme
+import com.dd3boh.outertune.ui.menu.BottomSheetMenu
+import com.dd3boh.outertune.ui.menu.MenuState
+import com.dd3boh.outertune.ui.player.BottomSheetPlayer
+import com.dd3boh.outertune.ui.screens.settings.SettingJumpHost
+import com.dd3boh.outertune.ui.screens.walkthrough.Tour
+import com.dd3boh.outertune.ui.screens.walkthrough.tourTarget
+import com.dd3boh.outertune.ui.screens.walkthrough.TourOverlay
+import com.dd3boh.outertune.ui.screens.walkthrough.TourState
+import com.dd3boh.outertune.ui.screens.walkthrough.tourFor
+import kotlinx.coroutines.withTimeoutOrNull
+import com.dd3boh.outertune.ui.screens.walkthrough.Install
+import com.dd3boh.outertune.ui.screens.walkthrough.NewThingAction
+import com.dd3boh.outertune.ui.screens.walkthrough.SETTINGS_TOUR
+import com.dd3boh.outertune.ui.screens.walkthrough.SETTINGS_WALK
+import com.dd3boh.outertune.ui.screens.walkthrough.TourStop
+import com.dd3boh.outertune.ui.screens.walkthrough.TourTargets
+import com.dd3boh.outertune.ui.screens.walkthrough.WelcomeBack
+import com.dd3boh.outertune.ui.screens.walkthrough.WelcomeShow
+import com.dd3boh.outertune.ui.screens.walkthrough.newThingsFor
+import com.dd3boh.outertune.ui.screens.walkthrough.owedThingsFor
+import com.dd3boh.outertune.ui.screens.walkthrough.welcomeCardFor
+import com.dd3boh.outertune.widget.MusicWidgetReceiver
+import com.dd3boh.outertune.widget.RecognitionWidgetReceiver
+import com.dd3boh.outertune.recognition.RecognitionTileService
+import com.dd3boh.outertune.constants.WalkthroughSeenVersionKey
+import com.dd3boh.outertune.constants.WelcomeLookedAtKey
+import com.dd3boh.outertune.constants.SimilarFromLastFmKey
+import com.dd3boh.outertune.constants.SimilarSourceKey
+import com.dd3boh.outertune.engine.SimilarSources
+import com.dd3boh.outertune.utils.lastFmQuestionAskable
+import com.dd3boh.outertune.ui.screens.AccountNoticeDialog
+import com.dd3boh.outertune.ui.screens.OptInCatchUp
+import com.dd3boh.outertune.ui.screens.accountNoticeOwed
+import com.dd3boh.outertune.ui.screens.isAccountCookie
+import com.dd3boh.outertune.ui.screens.catchUpOwed
+import com.dd3boh.outertune.ui.screens.Screens
+import com.dd3boh.outertune.ui.screens.search.SearchBarContainer
+import com.dd3boh.outertune.ui.theme.ColorSaver
+import com.dd3boh.outertune.ui.theme.DefaultThemeColor
+import com.dd3boh.outertune.ui.theme.OuterTuneTheme
+import com.dd3boh.outertune.ui.theme.extractThemeSource
+import com.dd3boh.outertune.ui.utils.appBarScrollBehavior
+import com.dd3boh.outertune.ui.utils.blockFocusWhen
+import androidx.compose.ui.input.InputMode
+import androidx.compose.ui.platform.LocalInputModeManager
+import androidx.compose.ui.focus.onFocusChanged
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.focus.FocusRequester
+import androidx.activity.compose.BackHandler
+import com.dd3boh.outertune.ui.utils.dpadOverlay
+import com.dd3boh.outertune.ui.utils.dpadFocusIndicator
+import com.dd3boh.outertune.ui.utils.dpadOverlayEscape
+import com.dd3boh.outertune.ui.utils.tvRemoteCursor
+import com.dd3boh.outertune.ui.utils.TvRemoteCursorState
+import com.dd3boh.outertune.ui.utils.DoubleCenterPressDetector
+import com.dd3boh.outertune.ui.utils.dpadTabBar
+import com.dd3boh.outertune.ui.utils.dpadBringIntoView
+import com.dd3boh.outertune.ui.utils.resetHeightOffset
+import com.dd3boh.outertune.ui.utils.SameTextSize
+import com.dd3boh.outertune.ui.utils.shrinkToFit
+import com.dd3boh.outertune.utils.ActivityLauncherHelper
+import com.dd3boh.outertune.utils.InstallSource
+import com.dd3boh.outertune.utils.installSource
+import com.dd3boh.outertune.utils.NetworkConnectivityObserver
+import com.dd3boh.outertune.utils.LoudnessRepair
+import com.dd3boh.outertune.utils.Scrobbler
+import com.dd3boh.outertune.utils.SyncUtils
+import com.dd3boh.outertune.utils.AutoBackup
+import com.dd3boh.outertune.utils.BackgroundCheckWorker
+import com.dd3boh.outertune.utils.ActiveCount
+import com.dd3boh.outertune.utils.PollChecker
+import com.dd3boh.outertune.utils.UpdateChecker
+import com.dd3boh.outertune.utils.UpdateInstaller
+import com.dd3boh.outertune.utils.AutoBlocker
+import com.dd3boh.outertune.utils.AlbumAnswerPretend
+import com.dd3boh.outertune.utils.YouTubeRegion
+import com.dd3boh.outertune.utils.AutoBlockerReturn
+import com.dd3boh.outertune.utils.ReportTrail
+import com.dd3boh.outertune.utils.ReturnVerdict
+import com.dd3boh.outertune.utils.reminderOwed
+import com.dd3boh.outertune.constants.AutoBlockerBlockedByKey
+import com.dd3boh.outertune.constants.AutoBlockerReturnAtKey
+import com.dd3boh.outertune.ui.component.updateTrouble
+import com.dd3boh.outertune.utils.coilCoroutine
+import com.dd3boh.outertune.utils.lmScannerCoroutine
+import com.dd3boh.outertune.utils.rememberEnumPreference
+import com.dd3boh.outertune.utils.rememberPreference
+import com.dd3boh.outertune.utils.rememberNullablePreference
+import com.dd3boh.outertune.utils.scanners.TrackTagReread
+import com.valentinilk.shimmer.LocalShimmerTheme
+import dagger.hilt.android.AndroidEntryPoint
+import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.launch
+import javax.inject.Inject
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.NavigationBarDefaults
+import com.dd3boh.outertune.constants.PlayerGlassIntensityKey
+import com.dd3boh.outertune.constants.BatteryModeKey
+import com.dd3boh.outertune.constants.FollowPhoneSaverKey
+import com.dd3boh.outertune.playback.PhoneBatterySaver
+import com.dd3boh.outertune.constants.PlayerLiquidGlassKey
+import com.dd3boh.outertune.ui.utils.LocalAppBackdrop
+import com.dd3boh.outertune.ui.utils.ScreenRate
+import com.dd3boh.outertune.ui.utils.LocalGlassStill
+import com.dd3boh.outertune.ui.utils.Animations
+import com.dd3boh.outertune.ui.utils.stillGlass
+import com.dd3boh.outertune.ui.utils.LocalAppBackdropAvailable
+import com.dd3boh.outertune.ui.utils.Landscape
+import com.dd3boh.outertune.ui.utils.LocalLandscape
+import androidx.compose.ui.platform.LocalWindowInfo
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
+import com.dd3boh.outertune.ui.utils.rememberGlassSpec
+import com.dd3boh.outertune.ui.utils.LocalGlassIntensity
+import com.dd3boh.outertune.ui.component.LocalSearchBarGlass
+import com.dd3boh.outertune.ui.utils.GlassSpec
+import androidx.compose.ui.graphics.drawscope.ContentDrawScope
+import androidx.compose.ui.graphics.graphicsLayer
+import com.dd3boh.outertune.ui.component.CrashReportDialog
+import com.kyant.backdrop.drawBackdrop
+import com.kyant.backdrop.effects.blur
+import com.kyant.backdrop.effects.lens
+import com.kyant.backdrop.effects.vibrancy
+import com.kyant.backdrop.backdrops.layerBackdrop
+import com.kyant.backdrop.backdrops.rememberLayerBackdrop
+import com.dd3boh.outertune.constants.AutoInstallUpdatesKey
+import com.dd3boh.outertune.constants.UpdateSnoozeUntilKey
+import com.dd3boh.outertune.constants.UPDATE_SNOOZE_MS
+import com.dd3boh.outertune.ui.component.UpdatePrompt
+import com.dd3boh.outertune.ui.component.UpdateWaitPhase
+import com.dd3boh.outertune.ui.component.updateWaitPhase
+import com.dd3boh.outertune.ui.component.UPDATE_SETTLE_MS
+import com.dd3boh.outertune.utils.INSTALL_RECHECK_MS
+import kotlinx.coroutines.delay
+import android.provider.Settings
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.repeatOnLifecycle
+import androidx.lifecycle.ViewModel
+import androidx.lifecycle.compose.LocalLifecycleOwner
+import com.dd3boh.outertune.utils.Toaster
+
+/**
+ * How long a back takes when it is not being dragged.
+ *
+ * A predictive back gesture seeks the pop transition by hand and never consults this, but a back
+ * from the button, from a keyboard, or a gesture released early still has to travel the rest of the
+ * way on its own. The screen now covers a full width rather than an eighth, so the old 200 ms read
+ * as a flick; this is slow enough to follow and short enough not to be in the way.
+ */
+private val NavPopSpec = tween<IntOffset>(300, easing = FastOutSlowInEasing)
+
+/**
+ * Whether this activity was started for the intent it holds.
+ *
+ * False when it was recreated with saved state (a rotation or other configuration change, or a
+ * restore after process death), and when the task was relaunched from recents. Both of those hand
+ * back the task's original intent with its extras.
+ */
+internal fun freshLaunch(hadSavedInstanceState: Boolean, flags: Int): Boolean =
+    !hadSavedInstanceState && (flags and Intent.FLAG_ACTIVITY_LAUNCHED_FROM_HISTORY) == 0
+
+/**
+ * Whether the launch intent's widget song is still owed: true only for a fresh launch whose
+ * action is the widget's ACTION_PLAY_SONG intent. See [freshLaunch].
+ */
+internal fun widgetSongOwed(action: String?, hadSavedInstanceState: Boolean, flags: Int): Boolean =
+    action == WidgetCommands.ACTION_PLAY_SONG && freshLaunch(hadSavedInstanceState, flags)
+
+/**
+ * A widget tap that reached the activity through onNewIntent and is waiting for the player.
+ *
+ * A ViewModel keeps it through a rotation or other recreation, and a new process starts without
+ * it, so a tap cannot start by itself on a later reopen from recents.
+ */
+internal class PendingWidgetTap : ViewModel() {
+    var intent by mutableStateOf<Intent?>(null)
+}
+
+/**
+ * A link that reached the activity through onNewIntent and is waiting for the player and for
+ * setup to be done. Kept the way [PendingWidgetTap] keeps a tap, and for the same reasons.
+ */
+internal class PendingLink : ViewModel() {
+    var link by mutableStateOf<String?>(null)
+}
+
+/**
+ * A tap on the recognition tile or widget, waiting for the first destination and for setup to be
+ * done. Kept the way [PendingWidgetTap] keeps a tap, so a rotation does not listen again.
+ */
+internal class PendingRecognition : ViewModel() {
+    var asked by mutableStateOf(false)
+}
+
+/**
+ * A tap on a download notification, waiting for the first destination and for setup to be done.
+ * Kept the way [PendingWidgetTap] keeps a tap, so a rotation does not open the downloads again.
+ */
+internal class PendingDownloads : ViewModel() {
+    var asked by mutableStateOf(false)
+}
+
+/**
+ * Whether a widget-tapped song plays on its own or keeps the radio.
+ *
+ * A local song's id is not a YouTube video id (SongEntity.generateSongId makes local ids "LS" plus
+ * random characters), so asking YouTube to start a radio from one fails outright: offline always,
+ * and online for want of anything meaningful to return. Home already makes this same choice for
+ * its own local rows; the widget mirrors it here.
+ */
+internal enum class WidgetPlaybackKind { LOCAL, RADIO }
+
+internal fun widgetPlaybackKind(metadata: MediaMetadata): WidgetPlaybackKind =
+    if (metadata.isLocal) WidgetPlaybackKind.LOCAL else WidgetPlaybackKind.RADIO
+
+/**
+ * A song tapped on the home screen widget.
+ *
+ * The widget carries enough of the song in its intent to play it without a lookup, because the
+ * song it is offering need not be in the library at all: Quick picks on the YouTube source is a
+ * shelf from the feed. The library is still asked first, since a song that is there comes with
+ * everything else the app knows about it.
+ */
+private fun playFromWidget(
+    intent: Intent?,
+    database: MusicDatabase,
+    playerConnection: PlayerConnection?,
+    scope: CoroutineScope,
+) {
+    if (intent?.action != WidgetCommands.ACTION_PLAY_SONG) return
+    val id = intent.getStringExtra(WidgetCommands.EXTRA_SONG_ID) ?: return
+    // Not until the player is connected. With the app closed, the tap creates the activity and the
+    // connection arrives a moment later, so the first call has none: taking the id out before
+    // this check threw it away, and the call that came with the connection found nothing to play.
+    val connection = playerConnection ?: return
+    // Taken out of the intent, or every recomposition and every rotation plays it again.
+    intent.removeExtra(WidgetCommands.EXTRA_SONG_ID)
+    val title = intent.getStringExtra(WidgetCommands.EXTRA_SONG_TITLE).orEmpty()
+    val artist = intent.getStringExtra(WidgetCommands.EXTRA_SONG_ARTIST).orEmpty()
+    val thumbnail = intent.getStringExtra(WidgetCommands.EXTRA_SONG_THUMBNAIL)
+    val duration = intent.getIntExtra(WidgetCommands.EXTRA_SONG_DURATION, 0)
+    scope.launch {
+        val known = runCatching { withContext(Dispatchers.IO) { database.song(id).first() } }.getOrNull()
+        val metadata = known?.toMediaMetadata() ?: MediaMetadata(
+            id = id,
+            title = title,
+            artists = listOf(MediaMetadata.Artist(null, artist)),
+            duration = duration,
+            thumbnailUrl = thumbnail,
+            genre = null,
+        )
+        when (widgetPlaybackKind(metadata)) {
+            WidgetPlaybackKind.LOCAL -> connection.playQueue(
+                ListQueue(title = metadata.title, items = listOf(metadata)),
+                origin = PlayOrigin.WIDGET,
+            )
+            WidgetPlaybackKind.RADIO -> connection.playQueue(
+                YouTubeQueue.radio(metadata),
+                isRadio = true,
+                origin = PlayOrigin.WIDGET,
+            )
+        }
+    }
+}
+
+@AndroidEntryPoint
+class MainActivity : ComponentActivity() {
+    val MAIN_TAG = "MainOtActivity"
+
+    private val tvRemoteCursor = TvRemoteCursorState()
+    private val remoteCenterPressDetector = DoubleCenterPressDetector(600L)
+    private var consumeRemoteCenterKeyUp = false
+
+    /**
+     * Handle TV remote input before Android routes it to the currently focused Compose child.
+     * This makes pointer movement and OK independent of the focus tree on every app screen.
+     * Two consecutive OK presses toggle the pointer; Back exits pointer mode before normal handling.
+     */
+    override fun dispatchKeyEvent(event: KeyEvent): Boolean {
+        if (BuildConfig.BUILD_TYPE != "tv") return super.dispatchKeyEvent(event)
+
+        // Cursor clicks are synthesized as touch events, which switches Compose to touch mode.
+        // Restore keyboard mode whenever the physical remote is used outside pointer mode.
+        if (event.keyCode == KeyEvent.KEYCODE_BACK && event.action == KeyEvent.ACTION_DOWN) {
+            // Back exits pointer mode, then continues through the normal Android/Compose path.
+            tvRemoteCursor.disable()
+        } else if (!tvRemoteCursor.enabled && event.action == KeyEvent.ACTION_DOWN) {
+            tvRemoteCursor.requestKeyboardMode()
+        }
+
+        val isCenterKey = event.keyCode == KeyEvent.KEYCODE_DPAD_CENTER ||
+            event.keyCode == KeyEvent.KEYCODE_ENTER ||
+            event.keyCode == KeyEvent.KEYCODE_NUMPAD_ENTER
+
+        // A double-OK shortcut means two consecutive OK presses. An arrow, Back, or any other
+        // physical key between them must cancel the pending first press; otherwise a later OK
+        // can unexpectedly switch pointer mode instead of activating the focused control.
+        if (!isCenterKey && event.action == KeyEvent.ACTION_DOWN) {
+            remoteCenterPressDetector.reset()
+        }
+
+        // The first OK remains a normal click/activation. A second OK within 600 ms toggles the
+        // pointer; consume that second key-up too, so it cannot activate the focused control.
+        if (isCenterKey && event.action == KeyEvent.ACTION_UP && consumeRemoteCenterKeyUp) {
+            consumeRemoteCenterKeyUp = false
+            return true
+        }
+        if (isCenterKey && event.action == KeyEvent.ACTION_DOWN && event.repeatCount == 0 &&
+            remoteCenterPressDetector.onPress(SystemClock.uptimeMillis())
+        ) {
+            consumeRemoteCenterKeyUp = true
+            tvRemoteCursor.toggle()
+            return true
+        }
+
+        if (tvRemoteCursor.onKeyEvent(event)) return true
+
+        // Compose's preview-key handler only runs while a descendant owns focus. On a fresh TV
+        // launch (or after a destination removes the focused control) there may be no such node,
+        // so the first arrow press would otherwise disappear before DpadFocus can recover it.
+        val isDpadArrow = when (event.keyCode) {
+            KeyEvent.KEYCODE_DPAD_UP, KeyEvent.KEYCODE_DPAD_DOWN,
+            KeyEvent.KEYCODE_DPAD_LEFT, KeyEvent.KEYCODE_DPAD_RIGHT -> true
+            else -> false
+        }
+        if (isDpadArrow && event.action == KeyEvent.ACTION_DOWN && event.repeatCount == 0 &&
+            tvRemoteCursor.focusFirstTarget()
+        ) return true
+
+        return super.dispatchKeyEvent(event)
+    }
+
+    @Inject
+    lateinit var database: MusicDatabase
+
+    // The rest are each built the first time something asks for it. Injected as themselves, they
+    // were all built before setContent, the song caches with them, whether a screen needed them
+    // or not. The providers in setContent hand them on the same way (providesComputed).
+    @Inject
+    lateinit var lazyDownloadUtil: dagger.Lazy<DownloadUtil>
+    val downloadUtil: DownloadUtil get() = lazyDownloadUtil.get()
+
+    @Inject
+    lateinit var lazySyncUtils: dagger.Lazy<SyncUtils>
+    val syncUtils: SyncUtils get() = lazySyncUtils.get()
+
+    @Inject
+    lateinit var lazyScrobbler: dagger.Lazy<Scrobbler>
+    val scrobbler: Scrobbler get() = lazyScrobbler.get()
+
+    @Inject
+    lateinit var lazyLoudnessRepair: dagger.Lazy<LoudnessRepair>
+    val loudnessRepair: LoudnessRepair get() = lazyLoudnessRepair.get()
+
+    @Inject
+    lateinit var lazyUpdateChecker: dagger.Lazy<UpdateChecker>
+    val updateChecker: UpdateChecker get() = lazyUpdateChecker.get()
+
+    @Inject
+    lateinit var lazyUpdateInstaller: dagger.Lazy<UpdateInstaller>
+    val updateInstaller: UpdateInstaller get() = lazyUpdateInstaller.get()
+
+    @Inject
+    lateinit var lazyPollChecker: dagger.Lazy<PollChecker>
+    val pollChecker: PollChecker get() = lazyPollChecker.get()
+
+    @Inject
+    lateinit var lazyActiveCount: dagger.Lazy<ActiveCount>
+    val activeCount: ActiveCount get() = lazyActiveCount.get()
+
+    lateinit var activityLauncher: ActivityLauncherHelper
+    lateinit var connectivityObserver: NetworkConnectivityObserver
+
+    private var playerConnection by mutableStateOf<PlayerConnection?>(null)
+
+    private val pendingWidgetTap: PendingWidgetTap by viewModels()
+
+    private val pendingLink: PendingLink by viewModels()
+    private val pendingRecognition: PendingRecognition by viewModels()
+    private val pendingDownloads: PendingDownloads by viewModels()
+
+    val controllerViewModel: MediaControllerViewModel by viewModels()
+
+    // storage permission helpers
+    val permissionLauncher =
+        registerForActivityResult(ActivityResultContracts.RequestPermission()) { isGranted ->
+            if (isGranted) {
+//                Toaster.show(this, "Granted", Toast.LENGTH_SHORT)
+            } else {
+                Toaster.show(this, getString(R.string.scanner_missing_storage_perm), Toast.LENGTH_SHORT)
+            }
+        }
+
+    private fun handleOpenPoll(intent: Intent?) {
+        if (intent?.getBooleanExtra(BackgroundCheckWorker.EXTRA_OPEN_POLL, false) != true) return
+        Log.i(MAIN_TAG, "Opening the question from its notification")
+        intent.removeExtra(BackgroundCheckWorker.EXTRA_OPEN_POLL)
+        pollChecker.requestOpen()
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        handleOpenPoll(intent)
+        // Every later widget tap comes through here, sometimes before the first composition (a
+        // tap on a task whose process died), so it is held until the player is connected.
+        // onNewIntent never replays an old intent, so nothing is gated here.
+        if (intent.action == WidgetCommands.ACTION_PLAY_SONG) pendingWidgetTap.intent = intent
+        // A link tapped or shared later, held the same way and opened by the effect that opens
+        // the launch intent's link. On a task whose process died it arrives here too, before the
+        // first composition.
+        newIntentLink(
+            intent.action, intent.dataString,
+            intent.getStringExtra(Intent.EXTRA_TEXT) ?: SystemSearch.searchLinkFor(intent.action, intent.getStringExtra(SearchManager.QUERY)),
+        )
+            ?.let { pendingLink.link = it }
+        if (intent.action == ACTION_PLAY_LIKED) playLikedWhenReady()
+        if (intent.action == RecognitionShortcut.ACTION) pendingRecognition.asked = true
+        if (intent.action == DownloadsShortcut.ACTION) pendingDownloads.asked = true
+        handlePlayFromSearch(intent)
+    }
+
+    private fun handlePlayFromSearch(intent: Intent) {
+        searchToPlay(intent.action, intent.data != null, intent.getStringExtra(SearchManager.QUERY))
+            ?.let(::playFromSearch)
+    }
+
+    /**
+     * "Play X" from a voice assistant, a car or an automation app. The words go to the media
+     * session the way a voice request in Android Auto reaches it, so the same search of the
+     * library plays, and with no words the queue there is carries on, or the saved one starts.
+     *
+     * The session takes requests from a connected controller. On a cold start the activity's own
+     * is still connecting, and an activity brought back from the background released its own
+     * when it stopped, so without one this waits for the next. The session's search is asked
+     * first: a request it cannot place fails and leaves the player alone, and the play() after it
+     * would have started whatever was there before.
+     */
+    private fun playFromSearch(query: String) {
+        controllerViewModel.addControllerCallback(lifecycle) { browser, _ ->
+            if (!browser.isConnected) return@addControllerCallback
+            dispose()
+            lifecycleScope.launch {
+                if (query.isNotEmpty()) {
+                    // How many the session found, or null when it could not be asked or answered
+                    // with an error: that was "No results found" too.
+                    val found = try {
+                        val result = browser.getSearchResult(query, 0, 1, null).await()
+                        if (result.resultCode == LibraryResult.RESULT_SUCCESS) result.value?.size ?: 0 else null
+                    } catch (e: CancellationException) {
+                        throw e
+                    } catch (e: Exception) {
+                        Log.w(MAIN_TAG, "Could not search for a play from search", e)
+                        null
+                    }
+                    when (playSearchOutcome(found)) {
+                        PlaySearch.FAILED -> {
+                            Toaster.show(this@MainActivity, R.string.play_search_failed, Toast.LENGTH_LONG)
+                            return@launch
+                        }
+                        PlaySearch.NOTHING -> {
+                            Toaster.show(this@MainActivity, R.string.no_results_found, Toast.LENGTH_SHORT)
+                            return@launch
+                        }
+                        PlaySearch.PLAY -> Unit
+                    }
+                }
+                browser.setMediaItems(listOf(searchPlayRequest(query)))
+                browser.prepare()
+                browser.play()
+            }
+        }
+    }
+
+    /**
+     * The "Play liked songs" shortcut: the liked songs in the order the Liked songs screen shows
+     * them, as its Play button plays them. It waits for the player, which on a cold start from
+     * the shortcut is not connected yet.
+     */
+    private fun playLikedWhenReady() {
+        lifecycleScope.launch {
+            val connection = snapshotFlow { playerConnection }.filterNotNull().first()
+            val prefs = dataStore.data.first()
+            val songs = database.likedSongs(
+                prefs[SongSortTypeKey].toEnum(SongSortType.CREATE_DATE),
+                prefs[SongSortDescendingKey] ?: true,
+            ).first()
+            if (songs.isEmpty()) {
+                Toaster.show(this@MainActivity, R.string.shortcut_no_liked_songs, Toast.LENGTH_SHORT)
+                return@launch
+            }
+            connection.playQueue(
+                ListQueue(title = getString(R.string.liked_songs), items = songs.map { it.toMediaMetadata() }),
+                origin = PlayOrigin.PLAYLIST,
+            )
+        }
+    }
+
+    // The phone's battery saver can turn Battery use's Saver on (PhoneBatterySaver). Its broadcast
+    // can be missed while the app is in the background, so it is read again whenever the app is seen.
+    override fun onStart() {
+        super.onStart()
+        PhoneBatterySaver.read(this)
+    }
+
+    override fun onResume() {
+        super.onResume()
+        PhoneBatterySaver.read(this)
+        // A resume of the downloads that Android refused while the app was in the background (the
+        // scan ends with one) goes out now that it is in front. The class is asked, not the
+        // injected instance, which would be built at every launch (DownloadServiceSends).
+        if (DownloadUtil.resumeOwed) downloadUtil.resumeDownloadsOnStart()
+    }
+
+    // The person has left: coming back is what a tap on Open Auto Blocker waits for.
+    override fun onStop() {
+        AutoBlockerReturn.left()
+        super.onStop()
+    }
+
+    /**
+     * InterTune is in front again. If the person tapped Open Auto Blocker and has been away since,
+     * within half an hour, the install they were blocked on starts again by itself, so Android's
+     * prompt comes at once (AutoBlockerReturn). The tap is forgotten as it is used: if Auto Blocker
+     * stops the install once more, the message is back and the next tap asks again.
+     *
+     * Called at every resume, so a resume with nothing asked for costs one look. The release is
+     * the one the checks found, or else the one they stored: the app may have been ended in
+     * Settings, and the checks are opt in. Android's own screen for "install unknown apps" is not
+     * opened by itself; the offer says what is missing, as it always did.
+     */
+    private suspend fun installAgainAfterAutoBlocker() {
+        val store = dataStore
+        if (store.current[AutoBlockerReturnAtKey] == null) return
+        val found = updateChecker.found()
+        val verdict = AutoBlockerReturn.take(store, System.currentTimeMillis(), AutoBlockerReturn.away)
+        Log.i(MAIN_TAG, "Back from Auto Blocker's page: $verdict")
+        if (verdict != ReturnVerdict.INSTALL_AGAIN || found == null) return
+        if (installSource() == InstallSource.F_DROID || !updateInstaller.canRequestInstall()) return
+        updateInstaller.acknowledge()
+        updateInstaller.installOrDownload(found.downloadUrl, found.sizeBytes)
+    }
+
+    override fun onDestroy() {
+        Log.i(MAIN_TAG, "onDestroy() called. isFinishing = $isFinishing")
+        try {
+            connectivityObserver.unregister()
+        } catch (e: UninitializedPropertyAccessException) {
+            // lol
+        }
+        // https://github.com/androidx/media/issues/805
+        if (Build.VERSION.SDK_INT == Build.VERSION_CODES.UPSIDE_DOWN_CAKE && (playerConnection?.player?.playWhenReady != true || playerConnection?.player?.mediaItemCount == 0)) {
+            val nm = getSystemService(NOTIFICATION_SERVICE) as NotificationManager
+            nm.cancel(MusicService.NOTIFICATION_ID)
+        }
+        lifecycle.removeObserver(controllerViewModel)
+        playerConnection?.dispose()
+        playerConnection = null
+
+        super.onDestroy()
+    }
+
+    @SuppressLint("UnusedBoxWithConstraintsScope")
+    @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        // Debug builds only: a file that makes this phone count as a Samsung, so Auto Blocker's
+        // message and way out can be seen on an emulator. Nothing in a release.
+        AutoBlocker.pretendFrom(this)
+        // Debug builds only, the same way: a file that makes YouTube count as seeing this connection
+        // in another country, so the note for Korea (#68) can be seen from anywhere.
+        YouTubeRegion.pretendFrom(this)
+        // And a file that makes album pages fail as YouTube's NOT_FOUND does, to see what they do then.
+        AlbumAnswerPretend.pretendFrom(this)
+        // Not again after a rotation or a restored process: the shortcut was tapped once. Nor when
+        // the task is reopened from recents, which starts it again with the shortcut's intent and
+        // replayed the liked songs over whatever was playing (Android 11 and older, where Back
+        // finishes the activity instead of keeping it).
+        if (intent?.action == ACTION_PLAY_LIKED && freshLaunch(savedInstanceState != null, intent?.flags ?: 0)) {
+            playLikedWhenReady()
+        }
+        // The same for the recognition tile and widget: listening starts for the tap, not for a
+        // reopen from recents, which brings the tile's intent back.
+        if (RecognitionShortcut.owed(intent?.action, savedInstanceState != null, intent?.flags ?: 0)) {
+            pendingRecognition.asked = true
+        }
+        // The same for a tap on a download notification: the downloads open for the tap.
+        if (DownloadsShortcut.owed(intent?.action, savedInstanceState != null, intent?.flags ?: 0)) {
+            pendingDownloads.asked = true
+        }
+        lifecycle.addObserver(controllerViewModel)
+        controllerViewModel.addControllerCallback(lifecycle) { controller, _ ->
+            // A controller comes again with every unlock: the connection made for the last one stops
+            // listening first, or each lock and unlock left one more listener rebuilding the queue.
+            playerConnection?.dispose()
+            playerConnection = PlayerConnection(controllerViewModel, database)
+        }
+        // A play-from-search request, once: not after a rotation or a restored process, and not
+        // when the task is reopened from recents, which starts it again with the intent it was
+        // first started with and would play an old request over whatever is playing now.
+        if (freshLaunch(savedInstanceState != null, intent?.flags ?: 0)) {
+            intent?.let(::handlePlayFromSearch)
+        }
+        WindowCompat.setDecorFitsSystemWindows(window, false)
+
+        activityLauncher = ActivityLauncherHelper(this)
+
+        // The window's compositions keep the app's pace: none with animations off (Animations).
+        setContent(parent = Animations.recomposer(this)) {
+            Log.v(MAIN_TAG, "RC-1")
+
+            // A TV remote is a keyboard-style input device. Compose can otherwise remain in
+            // touch mode on some TV launchers, leaving keyboard-only focus targets unavailable.
+            val inputModeManager = LocalInputModeManager.current
+            LaunchedEffect(BuildConfig.BUILD_TYPE) {
+                if (BuildConfig.BUILD_TYPE == "tv") {
+                    inputModeManager.requestInputMode(InputMode.Keyboard)
+                }
+            }
+
+            val coroutineScope = rememberCoroutineScope()
+            val haptic = LocalHapticFeedback.current
+            val snackbarHostState = remember { SnackbarHostState() }
+
+            val enableDynamicTheme by rememberPreference(DynamicThemeKey, defaultValue = true)
+            val darkTheme by rememberEnumPreference(DarkModeKey, defaultValue = DarkMode.AUTO)
+            val highContrastCompat by rememberPreference(HighContrastKey, defaultValue = false)
+            val chosenPureBlack by rememberPreference(PureBlackKey, defaultValue = false)
+            val isSystemInDarkTheme = isSystemInDarkTheme()
+            // Battery use in force, read here once for the whole app (LocalBatteryMode): the mode
+            // picked, and Saver while the phone's battery saver is on and the switch under it lets
+            // it in. The theme, the glass, the frame rate, the playing bars, the player's background
+            // and the rows of Settings that Saver holds all follow it.
+            val chosenBatteryMode by rememberEnumPreference(BatteryModeKey, defaultValue = BatteryUse.DEFAULT)
+            val followPhoneSaver by rememberPreference(FollowPhoneSaverKey, defaultValue = BatteryUse.FOLLOW_PHONE_DEFAULT)
+            val phoneSaverOn by PhoneBatterySaver.on.collectAsState()
+            val batteryMode = BatteryUse.inForce(chosenBatteryMode, followPhoneSaver, phoneSaverOn)
+            // Saver is dark with pure black, as Android's own battery saver is, whatever was picked;
+            // nothing is written, so leaving Saver gives the theme back (BatteryUse.darkTheme).
+            val useDarkTheme = remember(darkTheme, isSystemInDarkTheme, batteryMode) {
+                BatteryUse.darkTheme(if (darkTheme == DarkMode.AUTO) isSystemInDarkTheme else darkTheme == DarkMode.ON, batteryMode)
+            }
+            val pureBlack = BatteryUse.pureBlack(chosenPureBlack, batteryMode)
+            // Saver holds the window to a slower frame rate (ScreenRate), undone at once when the mode changes.
+            val lowFrameRate = BatteryUse.lowFrameRate(batteryMode)
+            LaunchedEffect(lowFrameRate) { ScreenRate.apply(this@MainActivity, lowFrameRate) }
+
+            val windowSizeClass = currentWindowAdaptiveInfo().windowSizeClass
+            // The window, measured once for everything that is laid out differently when a phone
+            // is on its side (Landscape.kt).
+            val windowPx = LocalWindowInfo.current.containerSize
+            val windowDensity = LocalDensity.current
+            // The width the root below is laid out at, which it reports itself: the system's
+            // size can be the wider of the two (Landscape.laidOutWidth). Forgotten when the
+            // system's size changes, so a width from before a turn is never the one used.
+            var laidOutWidth by remember(windowPx) { mutableIntStateOf(0) }
+            val landscape = remember(windowPx, laidOutWidth, windowDensity) {
+                with(windowDensity) {
+                    Landscape(Landscape.laidOutWidth(windowPx.width, laidOutWidth).toDp(), windowPx.height.toDp())
+                }
+            }
+//            val tabMode = this@MainActivity.tabMode()
+            // The rail for a wide window, and for a short one: a phone on its side that is not
+            // 840dp wide used to keep the bar along the bottom, a sixth of the height it had.
+            val useNavRail by remember(landscape) {
+                derivedStateOf {
+                    windowSizeClass.windowWidthSizeClass == WindowWidthSizeClass.EXPANDED || landscape.active
+                }
+            }
+
+
+            val (oobeStatus) = rememberPreference(OobeStatusKey, defaultValue = 0)
+
+            val (slimNavPreference) = rememberPreference(SlimNavBarKey, defaultValue = false)
+
+            /**
+             * The slim bar, forced when the window is too short to spare the room.
+             *
+             * In Samsung's pop up view the whole app is a window a few hundred dp tall, and the
+             * navigation bar was taking a fifth of it: 68dp of chrome with labels under the icons,
+             * above a mini player, inside something the size of a playing card. The same is true
+             * of any short window, landscape included.
+             *
+             * Forced rather than offered, and the preference is still honoured in the other
+             * direction: somebody who asked for the slim bar keeps it everywhere, somebody who did
+             * not gets it back the moment the window is a normal height again.
+             */
+            val slimNav = slimNavPreference ||
+                    windowSizeClass.windowHeightSizeClass == WindowHeightSizeClass.COMPACT
+            val (enabledTabs) = rememberPreference(EnabledTabsKey, defaultValue = DEFAULT_ENABLED_TABS)
+            val navigationItems = Screens.getScreens(enabledTabs)
+            // One size for the tabs' names, in the bar or in the rail: see TabLabel.
+            val tabNames = remember { SameTextSize() }
+            val (defaultOpenTab, onDefaultOpenTabChange) = rememberPreference(
+                DefaultOpenTabKey,
+                defaultValue = Screens.Home.route
+            )
+
+
+
+
+            LaunchedEffect(Unit) {
+                // Look for a newer release. Does nothing unless the user opted in, and never asks
+                // more than once in two minutes, so this is cheap to call on every open. Failure
+                // is silent on purpose: nobody opened a music player to be told GitHub is down.
+                coroutineScope.launch { updateChecker.check() }
+
+                // Same contract as the update check: nothing happens unless the user opted in, it
+                // rate limits itself, and failure is silent.
+                coroutineScope.launch {
+                    // Only when the activity starts afresh. A rotation or a restore recreates it
+                    // while setup or the catch-up screen may be open, and somebody who has just
+                    // said yes to questions there, with news not answered yet, would have news
+                    // switched on before being asked. The switch-over only needs one fresh launch.
+                    if (savedInstanceState == null) pollChecker.adoptNewsChoice()
+                    pollChecker.check()
+                }
+                // Re-applied on every launch, once. This is also what puts the schedule back after
+                // a reboot, since WorkManager needs the app to run once before it will restore its
+                // own. A schedule that is there is kept, and replaced only when it was made for
+                // another interval than the setting says, because replacing made every launch a
+                // check (BackgroundCheckWorker.schedule says why).
+                BackgroundCheckWorker.schedule(this@MainActivity)
+
+                // And the same again for the once-a-day count: off unless asked for, silent when
+                // it fails, and a no-op on every open after the first one each day.
+                coroutineScope.launch { activeCount.ping() }
+                // Scheduled backups: a no-op until the switch is on, and otherwise puts the schedule
+                // back if it is missing. It replaces one that is there only when it was made for
+                // another interval than the settings say, as after a Restore, because replacing
+                // made every launch a backup (AutoBackup.schedule says why).
+                AutoBackup.schedule(this@MainActivity)
+
+                // A notification about a question opens the question. handleOpenPoll is called for
+                // the intent that started this, and again from onNewIntent when the app was already
+                // running, since Android delivers that to the existing instance instead. Not for a
+                // task reopened from recents or an activity restored after process death: both hand
+                // back the original intent with the extra still in it, because handleOpenPoll's
+                // removeExtra only changed the old process's copy.
+                if (freshLaunch(savedInstanceState != null, intent?.flags ?: 0)) {
+                    handleOpenPoll(intent)
+                }
+
+                // Receives the outcome of an in-app install. Registered here rather than in the
+                // manifest because it is only meaningful while the app is alive to show it.
+                updateInstaller.registerReceiver()
+                // Forget the update once it has actually installed, so a finished one cannot sit
+                // there prompting forever if the process happened to survive.
+                updateInstaller.onInstalled = { coroutineScope.launch { updateChecker.clearFound() } }
+
+                // local media & download folders auto scan. The downloads are had here, on the
+                // main thread, so that when nothing has built them yet they are built there, as
+                // they always were: building them sets up their download manager, which is used
+                // from the main thread only.
+                val downloads = downloadUtil
+                coroutineScope.launch(lmScannerCoroutine) {
+                    scanInit(
+                        this@MainActivity, database, downloads, coroutineScope, playerConnection,
+                        snackbarHostState
+                    )
+                    // Once, and quietly: the track and disc numbers of local songs scanned before 0.12.5.
+                    TrackTagReread.runOnce(this@MainActivity, database)
+                }
+            }
+
+
+            LaunchedEffect(useDarkTheme) {
+                setSystemBarAppearance(useDarkTheme)
+            }
+            var themeColor by rememberSaveable(stateSaver = ColorSaver) {
+                mutableStateOf(DefaultThemeColor)
+            }
+
+            // One observer for the activity, not one per recomposition of this scope. This scope
+            // recomposes on every song change (it reads themeColor, and dynamic theme is on by
+            // default), and a new registration replays onAvailable for the network that is
+            // already there, which calls Throttle.onNetworkChanged() and clears whatever back-off
+            // is in effect. onDestroy unregisters it.
+            connectivityObserver = remember { NetworkConnectivityObserver(this@MainActivity) }
+            val isNetworkConnected by connectivityObserver.networkStatus.collectAsState(true)
+
+            LaunchedEffect(playerConnection, enableDynamicTheme, isSystemInDarkTheme) {
+                val playerConnection = playerConnection
+                if (!enableDynamicTheme || playerConnection == null) {
+                    themeColor = DefaultThemeColor
+                    return@LaunchedEffect
+                }
+                playerConnection.service.currentMediaMetadata.collectLatest { song ->
+                    // Done inside collectLatest rather than launched from it. Launching made the
+                    // lambda return the moment the job was handed off, so collectLatest had
+                    // nothing left to cancel when the next song arrived: every skip added another
+                    // image load and palette extraction racing the others to write themeColor,
+                    // and the winner was whichever finished last, not whichever song was playing.
+                    // Skipping quickly could therefore settle the theme on a song two back.
+                    themeColor = withContext(coilCoroutine) {
+                        var ret = DefaultThemeColor
+                        // A 100px thumbnail, the same one Player.kt asks for when it extracts the
+                        // gradient. Local files were already capped at 100px here, but a remote
+                        // song passed its bare thumbnailUrl with no size, so Coil fetched and
+                        // software-decoded the cover at whatever size that url named, often 544px
+                        // and over a megabyte of heap, on every track change, screen off included,
+                        // only to boil it down to one colour. Palette scales its input down to
+                        // roughly 112px square before it looks at it anyway, so the colour comes
+                        // out near enough the same. It is also the url the player's gradient and
+                        // blur backgrounds ask for, so they share one cached copy of it.
+                        val model = song?.getThumbnailModel(100, 100)
+                        if (model != null) {
+                            val result = applicationContext.imageLoader.execute(
+                                ImageRequest.Builder(applicationContext)
+                                    .data(model)
+                                    .allowHardware(false)
+                                    .build()
+                            )
+
+                            ret = result.image?.toBitmap()?.extractThemeSource() ?: DefaultThemeColor
+                        }
+                        ret
+                    }
+                }
+            }
+
+
+            OuterTuneTheme(
+                context = this@MainActivity,
+                darkTheme = useDarkTheme,
+                pureBlack = pureBlack,
+                highContrastCompat = highContrastCompat,
+                themeColor = themeColor
+            ) {
+                Log.v(MAIN_TAG, "RC-2.1")
+
+                /**
+                 * Offer the update, and let the answer stick.
+                 *
+                 * Shown regardless of the automatic setting, because Android never installs without
+                 * a confirmation anyway, so there is no version of this that happens invisibly. The
+                 * setting only decides whether the apk is already downloaded by the time this
+                 * appears.
+                 *
+                 * Snoozed rather than dismissed by default: "later" writes a timestamp an hour out,
+                 * and tapping outside counts as later. Only Cancel marks the version dismissed, and
+                 * that is per version, so the next release still gets through.
+                 */
+                val pendingUpdate by updateChecker.available.collectAsState()
+
+                // Re-read on resume. Granting "install unknown apps" happens in another activity,
+                // and a plain canRequestInstall() call would still read false when the user comes
+                // back, so the prompt would keep offering to send them there. The tap handler
+                // re-checks live so it always behaves correctly; this is what makes it also say
+                // the right thing.
+                var canInstall by remember { mutableStateOf(updateInstaller.canRequestInstall()) }
+                // When the app last came to the front, for the update dialog's moment of quiet
+                // after Android's window: see UPDATE_SETTLE_MS.
+                var frontSince by remember { mutableLongStateOf(SystemClock.elapsedRealtime()) }
+                // The wait for Android's window, put aside with Back or a tap outside. Until the app
+                // next comes to the front: the window still waits, and the dialog says so again.
+                var waitPutAway by remember { mutableStateOf(false) }
+                val lifecycleOwner = LocalLifecycleOwner.current
+                DisposableEffect(lifecycleOwner) {
+                    val observer = LifecycleEventObserver { _, event ->
+                        if (event == Lifecycle.Event.ON_RESUME) {
+                            canInstall = updateInstaller.canRequestInstall()
+                            frontSince = SystemClock.elapsedRealtime()
+                            waitPutAway = false
+                            updateInstaller.onShown()
+                            coroutineScope.launch { installAgainAfterAutoBlocker() }
+                        } else if (event == Lifecycle.Event.ON_PAUSE) {
+                            updateInstaller.onHidden()
+                        }
+                    }
+                    lifecycleOwner.lifecycle.addObserver(observer)
+                    onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+                }
+                val autoInstall by rememberPreference(AutoInstallUpdatesKey, defaultValue = false)
+                val snoozeUntil by rememberPreference(UpdateSnoozeUntilKey, defaultValue = 0L)
+                val installState by updateInstaller.state.collectAsState()
+
+                // Pre-fetch only when asked to, and only once per found update. Never on F-Droid:
+                // the switch that turns autoInstall on is hidden there, but the preference can
+                // still be true from before that install source was checked (an older build, a
+                // restored backup), and a GitHub apk downloaded to an F-Droid install can never be
+                // the one that gets installed.
+                val fromFdroid = remember { installSource() == InstallSource.F_DROID }
+                LaunchedEffect(pendingUpdate, autoInstall) {
+                    val u = pendingUpdate
+                    if (u != null && updatePrefetchOwed(
+                            autoInstall = autoInstall,
+                            fromFdroid = fromFdroid,
+                            installerBusy = updateInstaller.isBusy,
+                            installerIdle = installState is UpdateInstaller.State.Idle,
+                        )
+                    ) {
+                        updateInstaller.download(u.downloadUrl, u.sizeBytes)
+                    }
+                }
+
+                var snoozeTick by remember { mutableStateOf(System.currentTimeMillis()) }
+                LaunchedEffect(snoozeUntil) {
+                    // Wake up when the snooze expires so the prompt returns without needing a
+                    // relaunch. A plain timestamp comparison would not recompose on its own.
+                    val wait = snoozeUntil - System.currentTimeMillis()
+                    if (wait > 0) {
+                        delay(wait)
+                        snoozeTick = System.currentTimeMillis()
+                    }
+                }
+
+                // From the tap on Install until Android has installed it, the prompt turns into a
+                // dialog that says what is happening, with nothing to tap twice. Shown whatever the
+                // snooze, since the tap may have come from Settings > Updates, and never for a
+                // download nobody tapped: that one never gets as far as Android.
+                var settleTick by remember { mutableLongStateOf(0L) }
+                val windowShownAt = (installState as? UpdateInstaller.State.AwaitingConfirmation)?.shownAt ?: 0L
+                val settleFrom = maxOf(windowShownAt, frontSince)
+                val busyPhase = if (fromFdroid) null else updateWaitPhase(
+                    installState,
+                    sinceWindowMs = settleTick.coerceAtLeast(SystemClock.elapsedRealtime()) - settleFrom,
+                )
+                LaunchedEffect(installState, settleFrom) {
+                    // Wakes the dialog when the quiet moment after Android's window is over. A
+                    // plain clock reading would not recompose on its own.
+                    val left = UPDATE_SETTLE_MS - (SystemClock.elapsedRealtime() - settleFrom)
+                    if (installState is UpdateInstaller.State.AwaitingConfirmation && left > 0) {
+                        delay(left)
+                        settleTick = SystemClock.elapsedRealtime()
+                    }
+                }
+                LaunchedEffect(installState) {
+                    // While Android has the install, its session is looked at now and then, so an
+                    // install that ends without a word, or that Android goes quiet about, lets the
+                    // dialog go instead of keeping someone behind it. Only while the app can be
+                    // seen: nobody is behind a dialog in an app that is away, and onShown looks
+                    // again when it is back.
+                    if (installState is UpdateInstaller.State.AwaitingConfirmation ||
+                        installState is UpdateInstaller.State.Installing
+                    ) {
+                        lifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) {
+                            while (true) {
+                                delay(INSTALL_RECHECK_MS)
+                                updateInstaller.recheck()
+                            }
+                        }
+                    }
+                }
+
+                // Hoisted so the walkthrough can stand aside for it. Two full screen prompts on
+                // one launch is one too many, and an update is the more urgent of the two.
+                val snoozed = snoozeUntil > snoozeTick.coerceAtLeast(System.currentTimeMillis())
+                val updatePromptVisible = pendingUpdate != null && if (busyPhase != null) {
+                    !(busyPhase == UpdateWaitPhase.WAITING && waitPutAway)
+                } else {
+                    !snoozed
+                }
+
+                pendingUpdate?.let { found ->
+                    if (updatePromptVisible) {
+                        UpdatePrompt(
+                            update = found,
+                            ready = updateInstaller.isDownloaded(found.sizeBytes),
+                            needsPermission = !canInstall,
+                            trouble = updateTrouble(
+                                fromFdroid = fromFdroid,
+                                blocked = installState is UpdateInstaller.State.Blocked,
+                                failed = installState is UpdateInstaller.State.Failed,
+                                samsung = AutoBlocker.likely(),
+                            ),
+                            failedReason = (installState as? UpdateInstaller.State.Failed)?.reason,
+                            downloadPercent = (installState as? UpdateInstaller.State.Downloading)
+                                ?.takeIf { updateInstaller.isBusy }
+                                ?.let { if (it.total > 0) ((it.downloaded * 100) / it.total).toInt() else -1 },
+                            busy = busyPhase,
+                            onShowWindowAgain = { updateInstaller.showWindowAgain() },
+                            onStop = {
+                                // Stop is "not now": asked again in an hour, as for later. Put off
+                                // first, so the offer does not flash up between the two.
+                                coroutineScope.launch {
+                                    dataStore.edit {
+                                        it[UpdateSnoozeUntilKey] =
+                                            System.currentTimeMillis() + UPDATE_SNOOZE_MS
+                                    }
+                                    updateInstaller.stop()
+                                }
+                            },
+                            onPutAway = { waitPutAway = true },
+                            onOpenAutoBlocker = {
+                                updateInstaller.acknowledge()
+                                // The install starts again by itself when they are back.
+                                AutoBlocker.openForUpdate(this@MainActivity)
+                            },
+                            onTryAgain = {
+                                updateInstaller.acknowledge()
+                                if (!updateInstaller.canRequestInstall()) {
+                                    startActivity(
+                                        Intent(
+                                            Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES,
+                                            "package:$packageName".toUri()
+                                        )
+                                    )
+                                } else {
+                                    updateInstaller.installOrDownload(found.downloadUrl, found.sizeBytes)
+                                }
+                            },
+                            onInstall = {
+                                // Android refuses to show its install prompt until this app is
+                                // allowed to install apps, and refuses silently, so send the user
+                                // to the one screen that grants it rather than appearing to do
+                                // nothing. The apk stays downloaded, so coming back and tapping
+                                // install again goes straight through.
+                                if (!updateInstaller.canRequestInstall()) {
+                                    startActivity(
+                                        Intent(
+                                            Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES,
+                                            "package:$packageName".toUri()
+                                        )
+                                    )
+                                } else {
+                                    updateInstaller.installOrDownload(found.downloadUrl, found.sizeBytes)
+                                }
+                            },
+                            onRemindLater = {
+                                // A download under way is stopped: left running, it would open
+                                // Android's install prompt for an update put off until later.
+                                if (updateInstaller.isBusy) updateInstaller.cancel()
+                                coroutineScope.launch {
+                                    dataStore.edit {
+                                        it[UpdateSnoozeUntilKey] =
+                                            System.currentTimeMillis() + UPDATE_SNOOZE_MS
+                                    }
+                                }
+                            },
+                            onCancel = {
+                                if (updateInstaller.isBusy) updateInstaller.cancel()
+                                coroutineScope.launch { updateChecker.dismiss(found.versionCode) }
+                            },
+                        )
+                    }
+                }
+
+                val density = LocalDensity.current
+                // ignoringVisibility, NOT systemBars: the landscape player hides the bars, and
+                // bottomInset feeds the player sheet's collapsedBound, which is a remember() key
+                // for its BottomSheetState. Using the live inset rebuilds that state the instant
+                // the bars toggle, cancelling any in-flight drag and springing the sheet back to
+                // its previous anchor. The ignoringVisibility value is what the bars *would*
+                // occupy, so it stays constant and the layout does not jump either.
+                val windowsInsets = WindowInsets.systemBarsIgnoringVisibility
+                val bottomInset = with(density) { windowsInsets.getBottom(density).toDp() }
+                val cutoutInsets = WindowInsets.displayCutout
+
+                val liquidGlass by rememberPreference(PlayerLiquidGlassKey, defaultValue = false)
+                val glassIntensity by rememberPreference(PlayerGlassIntensityKey, defaultValue = 1f)
+                // TIRAMISU because lens() needs a RuntimeShader and the settings toggle is only
+                // offered at 33+. !useNavRail because playerAwareWindowInsets reserves left = 80dp
+                // on tablets, so nothing ever scrolls behind the rail and a glass rail would be a
+                // full offscreen pass refracting the flat surface fill. A phone on its side has
+                // the rail too, and still has the page scrolling behind its search pill and its
+                // mini player, so those two keep their glass there; the rail itself stays solid.
+                val backdropAvailable = Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
+                        (!useNavRail || landscape.active)
+                val navGlass = liquidGlass && backdropAvailable
+                // Saver keeps the glass where it is and draws it still: no layer is recorded for it
+                // and no panel blurs or bends one (BatteryUse.glassStill, LocalGlassStill).
+                val glassStill = BatteryUse.glassStill(batteryMode)
+                val appBackdrop = rememberLayerBackdrop()
+
+                val navController = rememberNavController()
+                val navBackStackEntry by navController.currentBackStackEntryAsState()
+                // The screens opened, for Report a problem's trail: by the route's pattern, never what fills it in.
+                DisposableEffect(navController) {
+                    val listener = NavController.OnDestinationChangedListener { _, destination, _ -> ReportTrail.thisRun.screen(destination.route) }
+                    navController.addOnDestinationChangedListener(listener)
+                    onDispose { navController.removeOnDestinationChangedListener(listener) }
+                }
+
+                /**
+                 * Hoisted out of [SearchBarContainer] so the navigation bar can close the search
+                 * overlay. The search bar is drawn on top of whatever destination you were on, not
+                 * as a destination of its own, so while it is open navBackStackEntry still points
+                 * at (say) library. Tapping Library therefore matched the "already on this tab"
+                 * branch and only requested a scroll-to-top, leaving the search UI up and looking
+                 * like the tap did nothing.
+                 */
+                var searchActive by rememberSaveable { mutableStateOf(false) }
+
+                BoxWithConstraints(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .onSizeChanged { laidOutWidth = it.width }
+                        .background(MaterialTheme.colorScheme.surface)
+                ) {
+                    Log.v(MAIN_TAG, "RC-2.2")
+
+                    fun getNavPadding(): Dp {
+                        return if (!useNavRail) (if (slimNav) 52.dp else 68.dp)
+                        // On its side the mini player is a panel floating over the page, and the
+                        // gap under it is the gesture bar's, or a small one where there is none.
+                        else if (landscape.active) (if (bottomInset >= 16.dp) 0.dp else 8.dp)
+                        else MinMiniPlayerHeight
+                    }
+
+                    val playerBottomSheetState = rememberBottomSheetState(
+                        dismissedBound = 0.dp,
+                        collapsedBound = bottomInset + MiniPlayerHeight + getNavPadding(),
+                        expandedBound = maxHeight,
+                    )
+
+                    // Keyed on the rail too: a turn no longer makes a new screen, so without it the
+                    // pages kept the left edge they had upright and ran under the rail on their side.
+                    val playerAwareWindowInsets =
+                        remember(
+                            bottomInset,
+                            playerBottomSheetState.isDismissed,
+                            useNavRail,
+                        ) {
+                            // TODO: Navbar is shown in all screens except for oobe (which doesn't use these insets). Idk what do to tbh
+                            var bottom = bottomInset + if (!useNavRail) NavigationBarHeight else 0.dp
+
+                            if (!playerBottomSheetState.isDismissed) bottom += MiniPlayerHeight
+                            windowsInsets
+                                .only(WindowInsetsSides.Horizontal + WindowInsetsSides.Top)
+                                .add(cutoutInsets.only(WindowInsetsSides.Horizontal))
+                                .add(
+                                    WindowInsets(
+                                        left = if (!useNavRail) 0.dp else NavigationBarHeight,
+                                        top = AppBarHeight,
+                                        bottom = bottom
+                                    )
+                                )
+                        }
+
+                    // One tour for the activity. It outlives individual screens because it
+                    // points at controls belonging to several of them, and a rotation.
+                    val tourState = rememberSaveable(saver = TourState.Saver) { TourState() }
+
+                    // Remembered: the default built a fresh state on every recomposition of this
+                    // scope, which only went unnoticed because the scope rarely recomposed.
+                    val appBarState = remember { TopAppBarState(-Float.MAX_VALUE, 0f, 0f) }
+                    val scrollBehavior = appBarScrollBehavior(
+                        state = appBarState,
+                        canScroll = {
+                            navBackStackEntry?.destination?.route?.startsWith("search/") == false &&
+                                    (playerBottomSheetState.isCollapsed || playerBottomSheetState.isDismissed)
+                        }
+                    )
+                    // Every screen feeds this one state, and nothing gave it back: scroll a
+                    // settings page, go back, and Home's search bar was still slid away. A tab, or
+                    // search, now arrives with it fully out. Only on arrival there: a tab being
+                    // left keeps its bar where it was while it fades, instead of flashing back in.
+                    // The route is read in the flow, not during composition, so a navigation does
+                    // not recompose everything this scope provides.
+                    val tabRoutes by rememberUpdatedState(navigationItems.map { it.route })
+                    LaunchedEffect(Unit) {
+                        snapshotFlow { navBackStackEntry?.destination?.route }
+                            .distinctUntilChanged()
+                            .collectLatest { route ->
+                                if (route in tabRoutes || route?.startsWith("search/") == true) {
+                                    appBarState.contentOffset = 0f
+                                    appBarState.resetHeightOffset()
+                                }
+                            }
+                    }
+
+                    // The Search shortcut. Search is the overlay over the current destination, not
+                    // a destination, so it is opened the way tapping the bar opens it, and not over
+                    // setup, which comes first. It waits for the first destination and then a frame:
+                    // the overlay shuts itself whenever the destination under it changes, and at
+                    // launch that includes the first one arriving.
+                    var searchFromShortcut by rememberSaveable {
+                        mutableStateOf(intent?.action == ACTION_SEARCH && oobeStatus >= OOBE_VERSION)
+                    }
+                    LaunchedEffect(searchFromShortcut) {
+                        if (!searchFromShortcut) return@LaunchedEffect
+                        snapshotFlow { navBackStackEntry }.first { it != null }
+                        withFrameNanos { }
+                        searchActive = true
+                        searchFromShortcut = false
+                    }
+
+                    // A page opened from outside the app goes in front of whatever was left open: the
+                    // player, on its queue or not, and the search overlay are put away first, as a
+                    // tab's tap puts them away, or the page opens behind them. A song found on the
+                    // phone opened its results under the queue he had left open (his note of 30 Oct
+                    // 2026), and the recognition tile listened under it.
+                    fun putAwayForPage() {
+                        if (playerBottomSheetState.isExpanded) playerBottomSheetState.collapseSoft()
+                        searchActive = false
+                    }
+
+                    // The recognition tile and widget: the recognition screen, listening, over
+                    // whatever is open, once the first destination is there and setup is done.
+                    LaunchedEffect(pendingRecognition.asked, oobeStatus) {
+                        if (!pendingRecognition.asked || oobeStatus < OOBE_VERSION) return@LaunchedEffect
+                        snapshotFlow { navBackStackEntry }.first { it != null }
+                        pendingRecognition.asked = false
+                        putAwayForPage()
+                        navController.navigate(RecognitionShortcut.ROUTE)
+                    }
+
+                    // A tap on a download notification: Downloaded songs, over whatever is open,
+                    // once the first destination is there and setup is done. Put in front like any
+                    // page from outside, and not opened a second time over itself.
+                    LaunchedEffect(pendingDownloads.asked, oobeStatus) {
+                        if (!pendingDownloads.asked || oobeStatus < OOBE_VERSION) return@LaunchedEffect
+                        snapshotFlow { navBackStackEntry }.first { it != null }
+                        pendingDownloads.asked = false
+                        putAwayForPage()
+                        val entry = navController.currentBackStackEntry
+                        val there = entry?.destination?.route == "auto_playlist/{playlistId}" &&
+                                entry?.arguments?.getString("playlistId") == DownloadsShortcut.PLAYLIST
+                        if (!there) navController.navigate(DownloadsShortcut.ROUTE)
+                    }
+
+                    // The Songs, Albums and Playlists shortcuts, handled the same way: their tab,
+                    // or Library on their filter, once the first destination is there. Since
+                    // upstream 25d504fe1 stopped making the tab the start destination they only
+                    // set the filter and opened on the default tab, and the filter was written
+                    // from composition, again on every recomposition of this scope, putting it
+                    // back over whatever had been picked since. Now it is written once for the
+                    // tap, and before Library opens, which reads it when it first draws.
+                    var libraryShortcutAction by rememberSaveable {
+                        mutableStateOf(
+                            intent?.action?.takeIf {
+                                libraryShortcut(it, navigationItems) != null && oobeStatus >= OOBE_VERSION
+                            }
+                        )
+                    }
+                    LaunchedEffect(libraryShortcutAction) {
+                        val target = libraryShortcut(libraryShortcutAction, navigationItems) ?: return@LaunchedEffect
+                        target.filter?.let { filter -> dataStore.edit { it[LibraryFilterKey] = filter.name } }
+                        snapshotFlow { navBackStackEntry }.first { it != null }
+                        navigateToNavTab(navController, target.screen.route, navigationItems, navController.currentBackStackEntry)
+                        libraryShortcutAction = null
+                    }
+
+
+                    // A Quick pick tapped on the home screen widget. The song that started the app
+                    // is decided once, on a fresh launch, and kept through a rotation. Any later
+                    // tap comes from onNewIntent through pendingWidgetTap. Each plays once, when
+                    // the player is connected.
+                    var widgetSongPending by rememberSaveable {
+                        mutableStateOf(
+                            widgetSongOwed(intent?.action, savedInstanceState != null, intent?.flags ?: 0)
+                        )
+                    }
+                    LaunchedEffect(playerConnection, widgetSongPending, pendingWidgetTap.intent) {
+                        if (widgetSongPending) {
+                            playFromWidget(intent, database, playerConnection, coroutineScope)
+                            if (playerConnection != null) widgetSongPending = false
+                        }
+                        pendingWidgetTap.intent?.let { pending ->
+                            playFromWidget(pending, database, playerConnection, coroutineScope)
+                            if (playerConnection != null) pendingWidgetTap.intent = null
+                        }
+                    }
+
+                    // A YouTube link, shared to the app or tapped. The one that started the app is
+                    // decided once, on a fresh launch; the effect that handled it went with
+                    // upstream's MainActivity refactor (25d504fe1), so a song link opened
+                    // InterTune on Home and did nothing else. Any later link comes from
+                    // onNewIntent through pendingLink, including one on a task whose process died,
+                    // which arrives before this composition runs. Each is held until the player is
+                    // connected, which on a cold start comes a moment later, and until setup is
+                    // finished, then cleared, so a rotation does not open it again.
+                    // Made before the links are opened below: a song link with no album opens its menu.
+                    // One for as long as this is on screen. It was made anew here whenever this
+                    // was composed again, and the colours above follow the cover of the song
+                    // playing: so every change of song handed the whole app a new menu, closed
+                    // and empty, in place of the one somebody had open.
+                    val menuSheetState = rememberModalBottomSheetState()
+                    val menuState = remember(menuSheetState) { MenuState(menuSheetState) }
+                    var pendingLaunchLink by rememberSaveable {
+                        mutableStateOf(
+                            launchLink(
+                                action = intent?.action,
+                                data = intent?.dataString,
+                                text = intent?.getStringExtra(Intent.EXTRA_TEXT)
+                                    ?: SystemSearch.searchLinkFor(intent?.action, intent?.getStringExtra(SearchManager.QUERY)),
+                                fromRecents = !freshLaunch(savedInstanceState != null, intent?.flags ?: 0),
+                            )
+                        )
+                    }
+                    LaunchedEffect(pendingLaunchLink, pendingLink.link, playerConnection, oobeStatus) {
+                        val link = pendingLaunchLink ?: pendingLink.link ?: return@LaunchedEffect
+                        val connection = playerConnection ?: return@LaunchedEffect
+                        if (oobeStatus < OOBE_VERSION) return@LaunchedEffect
+                        snapshotFlow { navBackStackEntry }.first { it != null }
+                        if (pendingLaunchLink != null) pendingLaunchLink = null else pendingLink.link = null
+                        if (linkOpensPage(link)) putAwayForPage()
+                        // A playlist of the library, tapped in the phone's own search (SystemSearch),
+                        // has no YouTube page: it opens here.
+                        val libraryPlaylist = SystemSearch.playlistOf(link)
+                        val searchWords = SystemSearch.searchOf(link)
+                        if (libraryPlaylist != null) {
+                            navController.navigate("local_playlist/$libraryPlaylist")
+                        } else if (SystemSearch.isHeard(link)) {
+                            // Songs named once the phone was back online (RecogniseLaterWorker).
+                            navController.navigate("recognition/history")
+                        } else if (searchWords != null) {
+                            // Words handed over by the phone's search, or by the song found on this
+                            // phone's notification: InterTune's own search for them.
+                            navController.navigate("search/${searchWords.urlEncode()}")
+                        } else {
+                            youtubeNavigator(
+                                this@MainActivity, navController, coroutineScope, connection, snackbarHostState, link.toUri(), menuState
+                            )
+                        }
+                    }
+
+                    CompositionLocalProvider(
+                        LocalDatabase provides database,
+                        LocalContentColor provides contentColorFor(MaterialTheme.colorScheme.surface),
+                        LocalMenuState provides menuState,
+                        LocalPlayerConnection provides playerConnection,
+                        LocalPlayerAwareWindowInsets provides playerAwareWindowInsets,
+                        LocalPlayerSheet provides playerBottomSheetState,
+                        // Computed: each is built when a screen first asks for it (see the
+                        // fields). The lambdas keep their identity across recompositions, the
+                        // Compose compiler remembers them, which a static local needs: one
+                        // handed a new value recomposes everything under it.
+                        LocalDownloadUtil providesComputed { downloadUtil },
+                        LocalShimmerTheme provides ShimmerTheme,
+                        LocalSyncUtils providesComputed { syncUtils },
+                        LocalScrobbler providesComputed { scrobbler },
+                        LocalLoudnessRepair providesComputed { loudnessRepair },
+                        LocalUpdateChecker providesComputed { updateChecker },
+                        LocalUpdateInstaller providesComputed { updateInstaller },
+                        LocalPollChecker providesComputed { pollChecker },
+                        LocalActiveCount providesComputed { activeCount },
+                        LocalNetworkConnected provides isNetworkConnected,
+                        LocalSnackbarHostState provides snackbarHostState,
+                        LocalAppBackdrop provides (if (navGlass) appBackdrop else null),
+                        LocalAppBackdropAvailable provides backdropAvailable,
+                        LocalLandscape provides landscape,
+                        LocalGlassIntensity provides glassIntensity,
+                        LocalBatteryMode provides batteryMode,
+                        LocalGlassStill provides glassStill,
+                        dpadBringIntoView(),
+                    ) {
+                        /**
+                         * Ask for the answers this install never gave.
+                         *
+                         * Derived from the preferences rather than snapshotted at launch, so it becomes true
+                         * the moment onboarding completes with a question still open. That is what makes the
+                         * ask unconditional: skipping on the welcome page, walking past the cards and
+                         * tapping finish, updating from a build whose wizard never had the card, or
+                         * restoring a backup that carried no answer all land here rather than leaving
+                         * somebody never asked.
+                         *
+                         * The rememberSaveable this replaces could not do that. With no keys its initialiser
+                         * ran once, at launch, when a fresh install still had OobeStatusKey at 0, so it
+                         * latched false for the whole first session, and being saveable it survived process
+                         * death too. Nothing re-evaluated it when the wizard wrote OOBE_VERSION seconds
+                         * later.
+                         *
+                         * Unset genuinely means "never asked" rather than "said no", because every path that
+                         * answers writes a value, so this cannot pester anyone who already declined.
+                         *
+                         * Latched open rather than driven straight off the gate: the gate goes false the
+                         * moment the answers are stored, and the screen is closed by its own Done
+                         * ([OptInCatchUp]) once they are written, not by a preference changing under it.
+                         *
+                         * Inside the theme on purpose: at the top of setContent it drew in baseline Material
+                         * purple, because OuterTuneTheme had not opened yet. Inside the providers for a
+                         * harder reason: [OptInCatchUp] reads LocalUpdateChecker and LocalPollChecker, for
+                         * the checks a yes starts, so above this block it throws rather than renders. The
+                         * dialog it replaced never noticed, having reached the checker through the
+                         * activity field instead.
+                         */
+                        val updateChoice by rememberNullablePreference(UpdateCheckEnabledKey)
+                        val pollChoice by rememberNullablePreference(PollsEnabledKey)
+                        val newsChoice by rememberNullablePreference(AnnouncementsEnabledKey)
+                        val usageChoice by rememberNullablePreference(UsageCountEnabledKey)
+                        // Last.fm is owed only where it can be asked for; see LastFmSimilarOptInCard.
+                        val similarStored by rememberNullablePreference(SimilarSourceKey)
+                        val similarOldSwitch by rememberNullablePreference(SimilarFromLastFmKey)
+                        val lastFmOwed = lastFmQuestionAskable() && !SimilarSources.asked(similarStored, similarOldSwitch)
+
+                        var catchUpOpen by rememberSaveable { mutableStateOf(false) }
+                        var catchUpDone by rememberSaveable { mutableStateOf(false) }
+
+                        LaunchedEffect(updateChoice, pollChoice, newsChoice, usageChoice, lastFmOwed, oobeStatus) {
+                            if (!catchUpDone && oobeStatus >= OOBE_VERSION &&
+                                catchUpOwed(updateChoice, pollChoice, newsChoice, usageChoice, lastFmOwed)
+                            ) {
+                                catchUpOpen = true
+                            }
+                        }
+
+                        /*
+                         * The walkthrough for whatever arrived in this build.
+                         *
+                         * Behind the catch-up on purpose: coming back to an update, being asked
+                         * to make three privacy decisions and then walked through six features
+                         * before ever reaching the app is not a welcome. Somebody who has just
+                         * answered those gets the tour on their next launch instead.
+                         *
+                         * Not behind the setup wizard. A first install is shown round as soon as
+                         * setup is done, in the same launch: held back the way the catch-up
+                         * holds it, the first session had no tour at all and the second opened
+                         * on one for no reason anybody could see.
+                         *
+                         * Latched the same way and for the same reason: finishing writes the
+                         * preference, and a screen that vanished under the finger that dismissed
+                         * it would read as a crash.
+                         */
+                        val (walkthroughSeen, setWalkthroughSeen) =
+                            rememberPreference(WalkthroughSeenVersionKey, defaultValue = 0)
+                        val pendingStops = remember(walkthroughSeen) { tourFor(walkthroughSeen) }
+                        // Whether this launch opened on the wizard, read from the stored value at
+                        // the first frame. catchUpDone holds the tour back to the next launch:
+                        // keyed on the catch-up being open alone, the effect below ran again the
+                        // moment it closed and started the tour straight after, which every
+                        // 0.10.9 upgrader would have met, since none has answered the usage count
+                        // yet. A launch that opened on the wizard is the one that is not held.
+                        val wizardThisLaunch = rememberSaveable { oobeStatus < OOBE_VERSION }
+
+                        /*
+                         * The welcome back page (WelcomeBack.kt): for somebody who has been here
+                         * before, what is new since, each thing with a way to it. It takes the
+                         * tour's place for them and starts tours of its own, which come back to it.
+                         *
+                         * It does not open by itself. Whoever is owed it finds a card at the top
+                         * of Home (welcomeCardFor): "See" opens the page, and the cross marks this
+                         * build as seen with nothing opened. Closing the page marks nothing: the
+                         * card stays, counting what is left, until every new thing has been looked
+                         * at (his word, 16 Oct 2026, when it went with things still unseen).
+                         *
+                         * welcomeEverything is the page asked for from Settings: it lists all
+                         * there is, and what is looked at there counts for the card as well.
+                         */
+                        var welcomeOpen by rememberSaveable { mutableStateOf(false) }
+                        var welcomeEverything by rememberSaveable { mutableStateOf(false) }
+                        // What "Show me" has asked for and which cards were looked at. Saved, so
+                        // that a rotation between the tap and the first bubble starts the tour
+                        // again instead of leaving neither it nor the page: see WelcomeShow.
+                        val welcomeShow = rememberSaveable(saver = WelcomeShow.Saver) { WelcomeShow() }
+                        // The cards looked at, kept on the phone so that the ticks are still there
+                        // when the page is opened again from the card, after a tour or a restart.
+                        val (welcomeLookedAtSaved, setWelcomeLookedAt) = rememberPreference(WelcomeLookedAtKey, defaultValue = "")
+                        val welcomeLookedAt = remember(welcomeLookedAtSaved, welcomeShow.lookedAt) {
+                            welcomeLookedAtSaved.lines().filter { it.isNotBlank() }.toSet() + welcomeShow.lookedAt
+                        }
+                        LaunchedEffect(welcomeShow.lookedAt) {
+                            val kept = welcomeLookedAtSaved.lines().filter { it.isNotBlank() }.toSet()
+                            if (!kept.containsAll(welcomeShow.lookedAt)) setWelcomeLookedAt((kept + welcomeShow.lookedAt).joinToString("\n"))
+                        }
+                        var tourFromWelcome by rememberSaveable { mutableStateOf(false) }
+                        // Quick picks is only listed where it has chips to be shown: see Install.
+                        val quickPicksSource by rememberEnumPreference(QuickPicksSourceKey, defaultValue = QuickPicksSource.YOUTUBE)
+                        val install = Install(quickPicksChips = quickPicksSource.orOffered().hasChips)
+                        val newThings = remember(walkthroughSeen, welcomeEverything, quickPicksSource) {
+                            newThingsFor(walkthroughSeen, everything = welcomeEverything, install = install)
+                        }
+                        // Owed, whatever has the screen just now. Asked of what is new since
+                        // somebody was last here and not of the page's list, which is all there
+                        // is while the page asked for from Settings is open.
+                        // Not of what has been looked at either: this holds the tour's new stops back
+                        // until the build is marked as seen, and the last tick comes a moment before
+                        // that mark.
+                        // What is new in InterTune is not a fork's to tell (FORKS.md).
+                        val welcomeOwed = welcomeCardFor(walkthroughSeen, install = install, enabled = Unreleased.WELCOME_BACK && BuiltInKeys.official) != null
+                        // The card as Home is to show it at this moment. A tour on its way from
+                        // the page counts as one that is up: the card would otherwise show for
+                        // the moment between the page closing and the first bubble.
+                        val welcomeCard by rememberUpdatedState(
+                            welcomeCardFor(
+                                walkthroughSeen,
+                                install = install,
+                                enabled = Unreleased.WELCOME_BACK && BuiltInKeys.official,
+                                setupDone = oobeStatus >= OOBE_VERSION,
+                                questionsOpen = catchUpOpen,
+                                tourUp = tourState.running || tourFromWelcome,
+                                pageOpen = welcomeOpen,
+                                lookedAt = welcomeLookedAt,
+                            )
+                        )
+                        // "See": the page as it used to open by itself. The cross: this build
+                        // marked as seen, and nothing opened. Both remembered, because they are
+                        // handed to the graph of destinations, which is built again whenever
+                        // what it is given changes, and the setter of a preference is a new
+                        // function at every recomposition.
+                        val seeWelcome = remember {
+                            {
+                                welcomeEverything = false
+                                welcomeShow.startOver()
+                                welcomeOpen = true
+                            }
+                        }
+                        val dismissWelcome = remember {
+                            {
+                                setWalkthroughSeen(BuildConfig.VERSION_CODE)
+                                setWelcomeLookedAt("")
+                            }
+                        }
+
+                        // Every new thing looked at, and the page and its tours closed: the card's
+                        // work is done. The build is marked as seen, as the cross does, and the
+                        // ticks are let go. Not while the page is open, whose list would empty
+                        // under the finger, nor during a tour from it. A thing with no button is
+                        // not waited for: nothing ever ticks it (owedThingsFor).
+                        val owedThings = remember(walkthroughSeen, quickPicksSource) { owedThingsFor(walkthroughSeen, install = install) }
+                        LaunchedEffect(owedThings, welcomeLookedAt, welcomeOpen, tourState.running, tourFromWelcome) {
+                            if (owedThings.isNotEmpty() && owedThings.all { it.id in welcomeLookedAt } &&
+                                !welcomeOpen && !tourState.running && !tourFromWelcome
+                            ) {
+                                setWalkthroughSeen(BuildConfig.VERSION_CODE)
+                                setWelcomeLookedAt("")
+                            }
+                        }
+
+                        // Nothing starts by itself for somebody who is owed the card: not the
+                        // page, and not the tour's handful of new stops, which the page lists.
+                        LaunchedEffect(oobeStatus, catchUpOpen, pendingStops, welcomeOwed, updatePromptVisible) {
+                            if (!catchUpOpen && (!catchUpDone || wizardThisLaunch) && !updatePromptVisible &&
+                                oobeStatus >= OOBE_VERSION && pendingStops.isNotEmpty() && !welcomeOwed &&
+                                !tourState.running && !welcomeOpen && !tourFromWelcome
+                            ) {
+                                // Straight from the wizard, its screen has to be gone and Home's
+                                // controls back first: a stop on Home whose control has not
+                                // reported when the tour starts is left out of it.
+                                if (wizardThisLaunch) withTimeoutOrNull(3000) {
+                                    while (navController.currentDestination?.route == "setup_wizard" || !TourTargets.known(Tour.SEARCH_BAR)) delay(50)
+                                }
+                                // A beat after the first frame, so the controls it points at have
+                                // reported where they are. Pointing at a target that has not been
+                                // measured yet puts the hole in the top left corner.
+                                delay(600)
+                                tourState.start(pendingStops)
+                            }
+                        }
+
+                        // Asked for from Settings, under About.
+                        LaunchedEffect(tourState.welcomeAsked) {
+                            if (tourState.welcomeAsked) {
+                                tourState.welcomeAsked = false
+                                welcomeEverything = true
+                                welcomeShow.startOver()
+                                welcomeOpen = true
+                            }
+                        }
+
+                        // Home's own screen, at its top. Not the start destination, which is the
+                        // tab the app opens on and need not be Home. And the top, because what a
+                        // stop on Home points at is an item of a lazy list, which is not there at
+                        // all once Home has been scrolled away from it. Home listens for
+                        // scrollToTop, as it does when its tab is tapped again.
+                        val goHome = {
+                            if (navController.currentDestination?.route != Tour.ROUTE_HOME &&
+                                !navController.popBackStack(Tour.ROUTE_HOME, inclusive = false)
+                            ) {
+                                navController.popBackStack(navController.graph.startDestinationId, inclusive = false)
+                                if (navController.currentDestination?.route != Tour.ROUTE_HOME) {
+                                    navigateToNavTab(navController, Tour.ROUTE_HOME, navigationItems, navController.currentBackStackEntry)
+                                }
+                            }
+                            navController.currentBackStackEntry?.savedStateHandle?.set("scrollToTop", true)
+                        }
+
+                        // To the screen a stop is on. From one screen of Settings to another
+                        // the tour leaves the first as it goes, the way somebody would by the
+                        // arrow, so that there is one screen over the list at a time and not
+                        // a dozen piled up under the last by the end of the closer look. Going
+                        // from the list into a screen this pops nothing, and neither does going
+                        // into Settings from Home, where the list is not underneath yet.
+                        val tourGoTo: (String) -> Unit = { route ->
+                            if (navController.currentDestination?.route != route) {
+                                navController.navigate(route) { popUpTo(Tour.ROUTE_SETTINGS) }
+                            }
+                        }
+
+                        // A tour from the page: to the screen its first stop is on, and started once
+                        // what it points at is there. If nothing of it is on screen (Quick picks
+                        // has no chips while the engine has fallen back to another row), the page
+                        // comes back and says so, rather than a button that did nothing, and the
+                        // card is not ticked.
+                        val showFromWelcome: (String, List<TourStop>) -> Unit = { card, stops ->
+                            if (stops.isEmpty()) {
+                                Toaster.show(this@MainActivity, R.string.welcome_back_not_here, Toast.LENGTH_LONG)
+                            } else {
+                                welcomeOpen = false
+                                tourFromWelcome = true
+                                welcomeShow.ask(card, stops)
+                            }
+                        }
+
+                        // Started by an effect of what was asked, not by a coroutine of the tap.
+                        // A rotation ends either, but what was asked is saved, so the effect runs
+                        // again on the other side of it and the tour still starts.
+                        LaunchedEffect(welcomeShow.waiting) {
+                            if (!welcomeShow.waiting) return@LaunchedEffect
+                            val stops = welcomeShow.stops
+                            val first = stops.firstOrNull()
+                            // After a rotation this can run before the screens are back.
+                            val screensThere = withTimeoutOrNull(3000) {
+                                while (navController.currentDestination == null) delay(50)
+                                true
+                            } == true
+                            if (screensThere && first != null) {
+                                val route = first.route
+                                if (route == null) goHome()
+                                else if (navController.currentDestination?.route != route) navController.navigate(route)
+                                val target = first.targetId
+                                if (target != null) withTimeoutOrNull(3000) { while (!TourTargets.known(target)) delay(50) }
+                                delay(150)
+                                tourState.start(stops)
+                            }
+                            if (tourState.running) {
+                                welcomeShow.shown()
+                            } else {
+                                tourFromWelcome = false
+                                if (screensThere) navController.popBackStack(navController.graph.startDestinationId, inclusive = false)
+                                welcomeOpen = true
+                                Toaster.show(this@MainActivity, R.string.welcome_back_not_here, Toast.LENGTH_LONG)
+                                welcomeShow.notShown()
+                            }
+                        }
+
+                        if (welcomeOpen && !tourState.running) {
+                            WelcomeBack(
+                                things = newThings,
+                                seen = welcomeLookedAt,
+                                returning = !welcomeEverything,
+                                // A card is ticked once there has been something to see: the
+                                // launcher's sheet for the widget, the tour's first bubble for
+                                // the rest. Not at the tap, which ticked cards that led nowhere.
+                                onShow = { thing ->
+                                    fun pinWidget(receiver: Class<*>) {
+                                        val widgets = AppWidgetManager.getInstance(this@MainActivity)
+                                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O && widgets.isRequestPinAppWidgetSupported) {
+                                            widgets.requestPinAppWidget(ComponentName(this@MainActivity, receiver), null, null)
+                                            welcomeShow.looked(thing.id)
+                                        } else {
+                                            Toaster.show(this@MainActivity, R.string.welcome_back_no_widget_host, Toast.LENGTH_LONG)
+                                        }
+                                    }
+                                    when (thing.action) {
+                                        NewThingAction.ADD_WIDGET -> pinWidget(MusicWidgetReceiver::class.java)
+                                        // The system's own question, "Add tile?", from Android 13. Whatever the
+                                        // answer, there was something to see. A refusal of the request itself
+                                        // offers the home screen button instead: Android's answers are 0 to 3
+                                        // (not added, there already, added, dismissed) and its refusals 1000 up.
+                                        NewThingAction.ADD_TILE ->
+                                            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                                                getSystemService(StatusBarManager::class.java).requestAddTileService(
+                                                    ComponentName(this@MainActivity, RecognitionTileService::class.java),
+                                                    getString(R.string.recognise),
+                                                    android.graphics.drawable.Icon.createWithResource(this@MainActivity, R.drawable.ic_recognise),
+                                                    mainExecutor,
+                                                ) { result ->
+                                                    if (result < StatusBarManager.TILE_ADD_REQUEST_ERROR_MISMATCHED_PACKAGE) welcomeShow.looked(thing.id)
+                                                    else pinWidget(RecognitionWidgetReceiver::class.java)
+                                                }
+                                            } else {
+                                                pinWidget(RecognitionWidgetReceiver::class.java)
+                                            }
+                                        NewThingAction.SHOW -> showFromWelcome(thing.id, thing.stops)
+                                        NewThingAction.NONE -> Unit
+                                    }
+                                },
+                                // The four groups and back to the page. The question the
+                                // tutorial's walk ends on is not asked here: whoever taps this
+                                // has asked for the walk, and the tour of the settings is one
+                                // row down under About.
+                                onShowSettings = { showFromWelcome(SETTINGS_WALK, SETTINGS_TOUR) },
+                                // Closing the page is not having seen everything: the card stays
+                                // on Home for what is left, and goes once all of it has been
+                                // looked at (above) or when it is dismissed.
+                                onDone = {
+                                    welcomeOpen = false
+                                    welcomeEverything = false
+                                },
+                            )
+                        }
+
+                        // The tutorial is over once its question is up, whatever the answer, so
+                        // it is marked as seen there and not only when the tour ends: somebody
+                        // who says yes and leaves the app half way round the settings is not
+                        // given the whole tutorial again at the next launch.
+                        LaunchedEffect(tourState.asking) {
+                            if (tourState.asking && !tourFromWelcome) setWalkthroughSeen(BuildConfig.VERSION_CODE)
+                        }
+
+                        if (catchUpOpen) {
+                            OptInCatchUp(appScope = coroutineScope, onDone = {
+                                catchUpOpen = false
+                                catchUpDone = true
+                                // The launch ping already ran, before there was an answer to read.
+                                // Somebody who has just said yes should count today rather than
+                                // tomorrow, so ask once more now that the preference is written.
+                                coroutineScope.launch { activeCount.ping() }
+                            })
+                        }
+
+                        /*
+                         * What signing in can cost, for whoever was signed in before setup and
+                         * Settings said it (AccountNotice.kt). Once, and never over something
+                         * else: the questions, the welcome page, a tour and the offer of an
+                         * update were asked for or are owed an answer, so it waits for them to
+                         * be gone and comes up then.
+                         */
+                        val (accountNoticeSeen, setAccountNoticeSeen) = rememberPreference(AccountNoticeSeenKey, defaultValue = false)
+                        val accountCookie by rememberPreference(InnerTubeCookieKey, defaultValue = "")
+                        val signedIn = remember(accountCookie) { isAccountCookie(accountCookie) }
+                        if (accountNoticeOwed(setupDone = oobeStatus >= OOBE_VERSION, signedIn = signedIn, seen = accountNoticeSeen) &&
+                            !catchUpOpen && !welcomeOpen && !tourState.running && !tourFromWelcome && !updatePromptVisible
+                        ) {
+                            AccountNoticeDialog(onDone = { setAccountNoticeSeen(true) })
+                        }
+
+                        /*
+                         * A word for somebody whose update Auto Blocker stopped and who has now
+                         * updated (AutoBlockerReturn): the build that saw it stop an install noted
+                         * its own version, and this one is newer, so Auto Blocker can go back on.
+                         * Shown as a card at the top of Home, where the app's other words after an
+                         * update are, and not over whatever the person is doing.
+                         *
+                         * Latched up once it is owed, and the note on the phone is forgotten when
+                         * Home first draws the card: said once. It stays up until Open Auto
+                         * Blocker or Done, and a rotation does not lose it. Only where Auto Blocker
+                         * exists: a backup restored on another phone brings the note along.
+                         */
+                        val blockedBy by rememberNullablePreference(AutoBlockerBlockedByKey)
+                        var autoBlockerNoteUp by rememberSaveable { mutableStateOf(false) }
+                        LaunchedEffect(blockedBy) {
+                            if (reminderOwed(blockedBy, BuildConfig.VERSION_CODE) && AutoBlocker.likely()) {
+                                autoBlockerNoteUp = true
+                            }
+                        }
+                        // Remembered, as the welcome card's are: the graph of destinations is built
+                        // again whenever what it is given changes.
+                        val autoBlockerNoteShown = remember { { AutoBlockerReturn.clearNote(applicationContext) } }
+                        val autoBlockerNoteOpen = remember {
+                            {
+                                autoBlockerNoteUp = false
+                                AutoBlocker.open(this@MainActivity)
+                                Unit
+                            }
+                        }
+                        val autoBlockerNoteDone = remember { { autoBlockerNoteUp = false } }
+
+                        // Behind the expanded player or the walkthrough, the screen is still composed, and
+                        // the arrow keys would wander into controls nobody can see.
+                        val screenCovered by remember(playerBottomSheetState, tourState) {
+                            derivedStateOf { playerBottomSheetState.progress >= 0.5f || tourState.running }
+                        }
+
+                        // Out of sight altogether, which is later than covered: the player fully open.
+                        val pagesHiddenByPlayer = remember(playerBottomSheetState) {
+                            { playerBottomSheetState.isExpanded }
+                        }
+
+                        // From the keys, Back on a tab's own screen first takes focus down to the
+                        // tabs: other than scrolling to the very end of a long list, the only way
+                        // there. The next Back does what it always did.
+                        var contentHasFocus by remember { mutableStateOf(false) }
+                        val selectedTabFocus = remember { FocusRequester() }
+                        val onTabRoot by remember(navigationItems) {
+                            derivedStateOf { navigationItems.any { it.route == navBackStackEntry?.destination?.route } }
+                        }
+
+                        // Establish focus when a TV destination first appears. The global D-pad
+                        // handler cannot receive keys until some child is focused; after the
+                        // transition settles, focus the selected tab on a tab root or the first
+                        // visible control on a detail/settings page. The Activity retries on the
+                        // first arrow key if a screen is still composing.
+                        LaunchedEffect(navBackStackEntry?.id, oobeStatus, onTabRoot) {
+                            if (BuildConfig.BUILD_TYPE != "tv" || oobeStatus < OOBE_VERSION ||
+                                searchActive || tvRemoteCursor.enabled || navBackStackEntry == null
+                            ) return@LaunchedEffect
+
+                            // Let the destination transition finish before checking focus:
+                            // the outgoing page can still own it while both pages are composed.
+                            kotlinx.coroutines.delay(350L)
+                            // A destination's first lazy row may still not be attached. Retry
+                            // until Compose exposes a real target, without stealing focus once
+                            // the user has started navigating.
+                            for (attempt in 0 until 25) {
+                                if (tvRemoteCursor.hasFocusTarget()) break
+                                val tabFocused = if (onTabRoot) {
+                                    runCatching { selectedTabFocus.requestFocus() }.getOrDefault(false)
+                                } else false
+                                val contentFocused = tabFocused || tvRemoteCursor.focusFirstTarget()
+                                if (contentFocused) break
+                                withFrameNanos { }
+                                kotlinx.coroutines.delay(60L)
+                            }
+                        }
+
+                        Box(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .then(
+                                    if (BuildConfig.BUILD_TYPE == "tv") {
+                                        Modifier.tvRemoteCursor(tvRemoteCursor)
+                                    } else Modifier
+                                )
+                                .dpadOverlayEscape(
+                                    tvNavigation = BuildConfig.BUILD_TYPE == "tv",
+                                    onSearchDown = {
+                                        if (searchActive && ViewCompat.getRootWindowInsets(window.decorView)?.isVisible(WindowInsetsCompat.Type.ime()) != true) {
+                                            searchActive = false
+                                            true
+                                        } else false
+                                    },
+                                )
+                        ) {
+                            Log.v(MAIN_TAG, "RC-3")
+
+
+                            val (backAnimations) = rememberPreference(BackAnimationsKey, defaultValue = true)
+                            val navHost: @Composable() (() -> Unit) = @Composable {
+                                NavHost(
+                                    navController = navController,
+                                    startDestination = (Screens.getAllScreens()
+                                        .find { it.route == defaultOpenTab })?.route
+                                        ?: Screens.Home.route,
+                                    enterTransition = {
+                                        val currentRouteIndex = navigationItems.indexOfFirst {
+                                            it.route == targetState.destination.route
+                                        }
+                                        val previousRouteIndex = navigationItems.indexOfFirst {
+                                            it.route == initialState.destination.route
+                                        }
+
+                                        if (currentRouteIndex == -1 || currentRouteIndex > previousRouteIndex)
+                                            slideInHorizontally { it / 8 } + fadeIn(tween(200))
+                                        else
+                                            slideInHorizontally { -it / 8 } + fadeIn(tween(200))
+                                    },
+                                    exitTransition = {
+                                        val currentRouteIndex = navigationItems.indexOfFirst {
+                                            it.route == initialState.destination.route
+                                        }
+                                        val targetRouteIndex = navigationItems.indexOfFirst {
+                                            it.route == targetState.destination.route
+                                        }
+
+                                        if (targetRouteIndex == -1 || targetRouteIndex > currentRouteIndex)
+                                            slideOutHorizontally { -it / 8 } + fadeOut(tween(200))
+                                        else
+                                            slideOutHorizontally { it / 8 } + fadeOut(tween(200))
+                                    },
+                                    // Back reveals rather than cross fades. Both pop transitions used to
+                                    // fade a whole screen in while fading another whole screen out, over the
+                                    // same eighth-width slide, so halfway through a back you were looking at
+                                    // two half transparent screens stacked on top of each other. Under a
+                                    // predictive back gesture, which seeks these transitions frame by frame,
+                                    // you sat in that ghosted middle for as long as your finger was down.
+                                    //
+                                    // Now the screen being left slides off in one piece and stays opaque,
+                                    // and the one underneath comes back at full opacity from a small
+                                    // parallax offset. Navigation gives the popping screen the higher z
+                                    // index, so it passes over the top rather than under.
+                                    popEnterTransition = {
+                                        val currentRouteIndex = navigationItems.indexOfFirst {
+                                            it.route == targetState.destination.route
+                                        }
+                                        val previousRouteIndex = navigationItems.indexOfFirst {
+                                            it.route == initialState.destination.route
+                                        }
+
+                                        val forward = previousRouteIndex != -1 && previousRouteIndex < currentRouteIndex
+                                        if (!backAnimations) {
+                                            // The cross fade this replaced, kept for anyone who wants it back.
+                                            if (forward) slideInHorizontally { it / 8 } + fadeIn(tween(200))
+                                            else slideInHorizontally { -it / 8 } + fadeIn(tween(200))
+                                        } else if (forward)
+                                            slideInHorizontally(NavPopSpec) { it / 5 }
+                                        else
+                                            slideInHorizontally(NavPopSpec) { -it / 5 }
+                                    },
+                                    popExitTransition = {
+                                        val currentRouteIndex = navigationItems.indexOfFirst {
+                                            it.route == initialState.destination.route
+                                        }
+                                        val targetRouteIndex = navigationItems.indexOfFirst {
+                                            it.route == targetState.destination.route
+                                        }
+
+                                        val leftwards = currentRouteIndex != -1 && currentRouteIndex < targetRouteIndex
+                                        if (!backAnimations) {
+                                            if (leftwards) slideOutHorizontally { -it / 8 } + fadeOut(tween(200))
+                                            else slideOutHorizontally { it / 8 } + fadeOut(tween(200))
+                                        } else if (leftwards)
+                                            slideOutHorizontally(NavPopSpec) { -it }
+                                        else
+                                            slideOutHorizontally(NavPopSpec) { it }
+                                    },
+                                    modifier = Modifier.nestedScroll(scrollBehavior.nestedScrollConnection)
+                                )
+                                {
+                                    appDestinations(
+                                        navController = navController,
+                                        scrollBehavior = scrollBehavior,
+                                        searchActive = { searchActive },
+                                        onSearchActiveChange = { searchActive = it },
+                                        tourState = tourState,
+                                        welcomeCard = { welcomeCard },
+                                        onWelcomeSee = seeWelcome,
+                                        onWelcomeDismiss = dismissWelcome,
+                                        autoBlockerNote = { autoBlockerNoteUp },
+                                        onAutoBlockerNoteShown = autoBlockerNoteShown,
+                                        onAutoBlockerNoteOpen = autoBlockerNoteOpen,
+                                        onAutoBlockerNoteDone = autoBlockerNoteDone,
+                                        appScope = coroutineScope,
+                                    )
+                                }
+                            }
+
+                            val navbar: @Composable() (() -> Unit) = @Composable {
+                                val dockGlass = rememberGlassSpec()
+                                val dockTint = dockGlass?.tint() ?: Color.Transparent
+                                val dockShape = RoundedCornerShape(if (slimNav) 26.dp else 28.dp)
+
+                                val navigationBarHeight by animateDpAsState(
+                                    targetValue = NavigationBarHeight,
+                                    animationSpec = NavigationBarAnimationSpec,
+                                    label = ""
+                                )
+
+                                NavigationBar(
+                                    modifier = Modifier
+                                        .align(Alignment.BottomCenter)
+                                        // The slide comes first, so that what follows goes with the
+                                        // bar. The three below mark it for the arrow keys with
+                                        // semantics of their own, and while they stood before the
+                                        // slide that mark stayed over the foot of the window with
+                                        // the bar gone under an open player: the queue's row of
+                                        // buttons, which is exactly there, counted as covered and
+                                        // no screen reader could reach it.
+                                        .offset {
+                                            if (navigationBarHeight == 0.dp) {
+                                                IntOffset(
+                                                    x = 0,
+                                                    y = (bottomInset + NavigationBarHeight).roundToPx()
+                                                )
+                                            } else {
+                                                val slideOffset =
+                                                    (bottomInset + NavigationBarHeight) * playerBottomSheetState.progress.coerceIn(
+                                                        0f,
+                                                        1f
+                                                    )
+                                                val hideOffset =
+                                                    (bottomInset + NavigationBarHeight) * (1 - navigationBarHeight / NavigationBarHeight)
+                                                IntOffset(
+                                                    x = 0,
+                                                    y = (slideOffset + hideOffset).roundToPx()
+                                                )
+                                            }
+                                        }
+                                        .blockFocusWhen(screenCovered)
+                                        .dpadOverlay()
+                                        .dpadTabBar()
+                                        .height(bottomInset + getNavPadding())
+                                        .then(
+                                            if (navGlass) {
+                                                Modifier
+                                                    // windowInsets is zeroed below for the glass
+                                                    // path, which would otherwise throw away the
+                                                    // horizontal component. useNavRail is EXPANDED
+                                                    // (>=840dp) so a landscape phone still gets the
+                                                    // bar and would slide tabs under a cutout.
+                                                    .windowInsetsPadding(
+                                                        windowsInsets.only(WindowInsetsSides.Horizontal)
+                                                            .add(cutoutInsets.only(WindowInsetsSides.Horizontal))
+                                                    )
+                                                    // Shrinks the drawn panel into a floating dock
+                                                    // without changing the measured outer height,
+                                                    // so collapsedBound and playerAwareWindowInsets
+                                                    // are untouched.
+                                                    .padding(
+                                                        start = 12.dp,
+                                                        end = 12.dp,
+                                                        bottom = (bottomInset - 4.dp).coerceAtLeast(6.dp)
+                                                    )
+                                                    // Still on Saver: the same dock, a frosted pane
+                                                    // with nothing recorded behind it (GlassSpec.still).
+                                                    .then(if (dockGlass?.still == true) Modifier.stillGlass { dockShape }.background(dockGlass.stillFill(), dockShape) else Modifier.drawBackdrop(
+                                                        backdrop = appBackdrop,
+                                                        shape = { dockShape },
+                                                        effects = {
+                                                            vibrancy()
+                                                            blur(dockGlass!!.blur.toPx())
+                                                            lens(
+                                                                refractionHeight = 20f.dp.toPx() * dockGlass.lensT,
+                                                                refractionAmount = 28f.dp.toPx() * dockGlass.lensT,
+                                                                depthEffect = true
+                                                            )
+                                                        }
+                                                    ))
+                                                    // Tint goes here, not in onDrawSurface: that
+                                                    // callback runs on the node's own unclipped
+                                                    // canvas, so it would paint a square patch.
+                                                    .background(dockTint, dockShape)
+                                            } else Modifier
+                                        ),
+                                    containerColor = if (navGlass) Color.Transparent
+                                    else MaterialTheme.colorScheme.surfaceColorAtElevation(6.dp),
+                                    contentColor = MaterialTheme.colorScheme.onSurface,
+                                    windowInsets = if (navGlass) WindowInsets(0, 0, 0, 0)
+                                    else NavigationBarDefaults.windowInsets
+                                ) {
+                                    navigationItems.fastForEach { screen ->
+                                        // TODO: display selection when based on root page user entered
+//                                        val isSelected = navBackStackEntry?.destination?.hierarchy?.any {
+//                                            it.route?.substringBefore("?")?.substringBefore("/") == screen.route
+//                                        } == true
+                                        val tabSelected = navBackStackEntry?.destination?.hierarchy?.any { it.route == screen.route } == true
+                                        // The slim bar has no text under its icons, and a tab
+                                        // then had no name at all for a screen reader: Material
+                                        // drops an icon's own description whenever a label is
+                                        // handed over, shown or not. So the name is on the tab.
+                                        val tabName = stringResource(screen.titleId)
+                                        NavigationBarItem(
+                                            // Only the library tab is pointed at, so only it is
+                                            // reported. Tagging every tab would have four of them
+                                            // writing bounds on every recomposition of the bar.
+                                            modifier = Modifier
+                                                .dpadFocusIndicator()
+                                                .then(if (screen.route == Screens.Library.route) {
+                                                    Modifier.tourTarget(Tour.NAV_LIBRARY)
+                                                } else Modifier)
+                                                .then(if (tabSelected) Modifier.focusRequester(selectedTabFocus) else Modifier)
+                                                .then(
+                                                if (slimNav) Modifier.semantics { contentDescription = tabName } else Modifier
+                                            ),
+                                            selected = tabSelected,
+                                            icon = {
+                                                Icon(
+                                                    screen.icon,
+                                                    contentDescription = null
+                                                )
+                                            },
+                                            // No label at all when slim: an empty one still kept its room and
+                                            // lifted the icon off the bar's middle (dvd, 27 Oct 2026).
+                                            label = if (slimNav) null else ({ TabLabel(stringResource(screen.titleId), tabNames) }),
+                                            onClick = {
+                                                if (playerBottomSheetState.isExpanded) {
+                                                    playerBottomSheetState.collapseSoft()
+                                                }
+
+                                                // Close the search overlay first. It is drawn on
+                                                // top of the current destination rather than being
+                                                // one, so while it is open the checks below still
+                                                // see the destination underneath it and would just
+                                                // scroll that to top, leaving search on screen.
+                                                if (searchActive) {
+                                                    searchActive = false
+                                                }
+
+                                                if (navBackStackEntry?.destination?.hierarchy?.any { it.route == screen.route } == true) {
+                                                    if (!searchActive) {
+                                                        navBackStackEntry?.savedStateHandle?.set(
+                                                            "scrollToTop",
+                                                            true
+                                                        )
+                                                    }
+                                                } else {
+                                                    navigateToNavTab(navController, screen.route, navigationItems, navBackStackEntry)
+                                                }
+
+                                                haptic.performHapticFeedback(HapticFeedbackType.ContextClick)
+                                            }
+                                        )
+                                    }
+                                }
+                            }
+
+                            @Composable
+                            fun navRail(alignment: Alignment) {
+                                val layoutDirection = LocalLayoutDirection.current
+                                val navigationBarHeight by animateDpAsState(
+                                    targetValue = NavigationBarHeight,
+                                    animationSpec = NavigationBarAnimationSpec,
+                                    label = ""
+                                )
+                                val leftInset = remember {
+                                    derivedStateOf {
+                                        playerAwareWindowInsets.getLeft(density, layoutDirection).dp
+                                    }
+                                }
+                                NavigationRail(
+                                    containerColor = MaterialTheme.colorScheme.surfaceColorAtElevation(6.dp),
+                                    header = {
+                                        Spacer(Modifier.height(8.dp))
+                                        Image(
+                                            modifier = Modifier
+                                                .size(36.dp)
+                                                .padding(start = 8.dp),
+                                            painter = painterResource(R.drawable.small_icon),
+                                            contentDescription = null
+                                        )
+                                    },
+                                    // The offset goes before verticalScroll so the scroll container
+                                    // slides away with the rail. After it, only the rail's content
+                                    // moved: the scroll container stayed where the rail had been, on
+                                    // top of the open player, and swallowed every tap on its left strip.
+                                    modifier = Modifier
+                                        .align(alignment)
+                                        // On TV, do not mark the rail as a floating overlay: the root
+                                        // D-pad handler must try Compose's native focus traversal first,
+                                        // so Right can leave the rail and enter the destination's content.
+                                        // The screen-wide geometry search remains its fallback.
+                                        .then(
+                                            if (BuildConfig.BUILD_TYPE == "tv") Modifier
+                                            else Modifier.dpadOverlay()
+                                        )
+                                        .blockFocusWhen(screenCovered)
+                                        .fillMaxHeight()
+                                        .offset {
+                                            if (navigationBarHeight == 0.dp) {
+                                                IntOffset(
+                                                    x = 0,
+                                                    y = (bottomInset + NavigationBarHeight).roundToPx()
+                                                )
+                                            } else {
+                                                val slideOffset =
+                                                    (bottomInset + NavigationBarHeight + leftInset.value) *
+                                                            playerBottomSheetState.progress.coerceIn(0f, 1f)
+                                                val hideOffset =
+                                                    (bottomInset + NavigationBarHeight) * (1 - navigationBarHeight / NavigationBarHeight)
+                                                IntOffset(
+                                                    x = -(slideOffset + hideOffset).roundToPx(),
+                                                    y = 0
+                                                )
+                                            }
+                                        }
+                                        .verticalScroll(rememberScrollState()),
+                                ) {
+                                    navigationItems.fastForEach { screen ->
+                                        // TODO: display selection when based on root page user entered
+//                                                val isSelected = navBackStackEntry?.destination?.hierarchy?.any {
+//                                                    it.route?.substringBefore("?")?.substringBefore("/") == screen.route
+//                                                } == true
+                                        // Named for a screen reader when slim, as in the bar above.
+                                        val tabName = stringResource(screen.titleId)
+                                        val tabSelected = navBackStackEntry?.destination?.hierarchy?.any { it.route == screen.route } == true
+                                        NavigationRailItem(
+                                            modifier = Modifier
+                                                .dpadFocusIndicator()
+                                                .then(if (tabSelected) Modifier.focusRequester(selectedTabFocus) else Modifier)
+                                                .then(if (slimNav) Modifier.semantics { contentDescription = tabName } else Modifier),
+                                            selected = tabSelected,
+                                            icon = {
+                                                Icon(
+                                                    screen.icon,
+                                                    contentDescription = null
+                                                )
+                                            },
+                                            // No label at all when slim: an empty one still kept its room and
+                                            // lifted the icon off the bar's middle (dvd, 27 Oct 2026).
+                                            label = if (slimNav) null else ({ TabLabel(stringResource(screen.titleId), tabNames) }),
+                                            onClick = {
+                                                if (playerBottomSheetState.isExpanded) {
+                                                    playerBottomSheetState.collapseSoft()
+                                                }
+                                                // Close the search overlay first. It is drawn on
+                                                // top of the current destination rather than being
+                                                // one, so while it is open the checks below still
+                                                // see the destination underneath it and would just
+                                                // scroll that to top, leaving search on screen.
+                                                if (searchActive) {
+                                                    searchActive = false
+                                                }
+
+                                                if (navBackStackEntry?.destination?.hierarchy?.any { it.route == screen.route } == true) {
+                                                    if (!searchActive) {
+                                                        navBackStackEntry?.savedStateHandle?.set(
+                                                            "scrollToTop",
+                                                            true
+                                                        )
+                                                    }
+                                                } else {
+                                                    navigateToNavTab(navController, screen.route, navigationItems, navBackStackEntry)
+                                                }
+
+                                                haptic.performHapticFeedback(HapticFeedbackType.ContextClick)
+                                            }
+                                        )
+                                    }
+                                }
+                            }
+
+                            val bottomSheetMenu: @Composable() (() -> Unit) = @Composable {
+                                BottomSheetMenu(
+                                    state = LocalMenuState.current,
+                                    modifier = Modifier.align(Alignment.BottomCenter)
+                                )
+                            }
+
+                            // Over the page colour, like the app backdrop, so the blur has something between rows.
+                            val navHostSurface = rememberUpdatedState(MaterialTheme.colorScheme.surface)
+                            val navHostBackdrop = rememberLayerBackdrop(
+                                onDraw = remember {
+                                    val draw: ContentDrawScope.() -> Unit = {
+                                        drawRect(navHostSurface.value)
+                                        drawContent()
+                                    }
+                                    draw
+                                }
+                            )
+
+                            // phone
+                            // Everything the glass panels refract goes in here. The .background()
+                            // must come AFTER layerBackdrop: LayerBackdropNode records only what
+                            // follows it in the chain, and the app's surface fill lives on the
+                            // outer BoxWithConstraints, outside this layer. Without it the recorded
+                            // layer is transparent between rows and blur() bleeds into nothing.
+                            // It used to come before, which looks the same on screen and records no
+                            // fill: the dock and the mini player then drew a blurred copy of the rows
+                            // with nothing behind it, and the rows themselves showed through that
+                            // copy, sharp. Only rows with a fill of their own were spared, such as
+                            // the song rows, which sit on a surface for the swipe to queue.
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxSize()
+                                    .then(
+                                        // Not recorded while the glass is still (Saver): no panel reads it then.
+                                        if (navGlass && !glassStill) {
+                                            Modifier
+                                                .layerBackdrop(appBackdrop)
+                                                .background(MaterialTheme.colorScheme.surface)
+                                        } else Modifier
+                                    )
+                                    .onFocusChanged { contentHasFocus = it.hasFocus }
+                                    .blockFocusWhen(screenCovered)
+                            ) {
+                                // The nav host in a layer of its own, which the search pill beside it reads for
+                                // its glass (LocalSearchBarGlass). Always wrapped so turning glass on or off does
+                                // not move the nav host in the composition.
+                                Box(
+                                    Modifier
+                                        .fillMaxSize()
+                                        .then(if (navGlass && !glassStill) Modifier.layerBackdrop(navHostBackdrop).graphicsLayer() else Modifier)
+                                ) {
+                                    // Under the open player the pages cannot be seen, and what
+                                    // only moves for the eye holds still (PlayingIndicator).
+                                    CompositionLocalProvider(LocalHiddenByPlayer provides pagesHiddenByPlayer) {
+                                        navHost()
+                                    }
+                                }
+
+                                // Only this search bar gets the glass. The "search" destination composes another
+                                // one inside the nav host, and that one would be reading a layer it is part of.
+                                CompositionLocalProvider(
+                                    LocalSearchBarGlass provides if (navGlass) GlassSpec(navHostBackdrop, glassIntensity.coerceIn(0f, 1f), still = glassStill) else null
+                                ) {
+                                    SearchBarContainer(navController, scrollBehavior, searchActive) { searchActive = it }
+                                }
+                            }
+
+                            // BottomSheetPlayer and the dock BOTH stay outside the published layer.
+                            // MiniPlayer consumes this backdrop, so putting the sheet inside would
+                            // make the layer contain a reader of itself: RenderNode::prepareTreeImpl
+                            // recurses until the native stack overflows and the process dies. The
+                            // sheet's collapsed fill is transparent under glass anyway (Player.kt),
+                            // so there is nothing of it worth capturing.
+                            // Not over setup either, even once it is marked done: its exit page stays on
+                            // screen for a moment after, and the configurator runs it again later.
+                            // Derived: reading the route here recomposed this whole scope, nav host
+                            // and player included, on every navigation. See the note above tabRoutes.
+                            val onSetupWizard by remember {
+                                derivedStateOf { navBackStackEntry?.destination?.route == "setup_wizard" }
+                            }
+                            if (oobeStatus >= OOBE_VERSION && !onSetupWizard) {
+                                BottomSheetPlayer(
+                                    state = playerBottomSheetState,
+                                    navController = navController
+                                )
+
+                                if (!useNavRail) {
+                                    navbar()
+                                    BackHandler(
+                                        enabled = contentHasFocus && onTabRoot && !searchActive &&
+                                                LocalInputModeManager.current.inputMode == InputMode.Keyboard
+                                    ) {
+                                        runCatching { selectedTabFocus.requestFocus() }
+                                    }
+                                } else {
+                                    navRail(if (LocalLayoutDirection.current == LayoutDirection.Rtl) Alignment.BottomEnd else Alignment.BottomStart)
+                                }
+                            }
+                            bottomSheetMenu()
+
+                            // After the navigation bar, not before it. The bar is a sibling of the
+                            // content box and is drawn after it, so an overlay inside that box ends
+                            // up underneath the bar: the tour would dim the screen right down to
+                            // the bar's top edge and then point at a Library tab it had neither
+                            // dimmed nor lit. Out here it is also outside the published glass
+                            // layer, which it has no business being refracted by.
+                            TourOverlay(
+                                state = tourState,
+                                // Two stops in a row on one screen are one screen, not two of it.
+                                onNavigate = tourGoTo,
+                                // Back out of a stop's screen to the one the stop before it is
+                                // on. That screen is underneath, since the tour came through it.
+                                // If it is not, it is opened the way a step forward opens it.
+                                onNavigateBack = { route ->
+                                    if (route == null) {
+                                        goHome()
+                                    } else if (navController.currentDestination?.route != route && !navController.popBackStack(route, inclusive = false)) {
+                                        tourGoTo(route)
+                                    }
+                                },
+                                onFinish = {
+                                    if (tourFromWelcome) {
+                                        // Left where it ends, to look at the setting it showed.
+                                        // Back goes the usual way, to Home in the end, where the
+                                        // card waits with what is still to be seen. It used to
+                                        // bring the page back, which hid the setting just shown
+                                        // (his word, 16 Oct 2026).
+                                        tourFromWelcome = false
+                                    } else {
+                                        // Not with a card waiting on Home: a tour asked for
+                                        // under About has shown none of what the card is about.
+                                        if (!welcomeOwed) setWalkthroughSeen(BuildConfig.VERSION_CODE)
+                                        // A first install's tour ends on its walk round Settings,
+                                        // and the closer look in whichever of their screens it
+                                        // had got to. Back out of them, so that what the tour
+                                        // leaves somebody in is the app and not its settings.
+                                        val route = navController.currentDestination?.route.orEmpty()
+                                        if (route == Tour.ROUTE_SETTINGS || route.startsWith(Tour.ROUTE_SETTINGS + "/")) {
+                                            navController.popBackStack(Tour.ROUTE_SETTINGS, inclusive = true)
+                                        }
+                                    }
+                                },
+                            )
+
+                            // A setting named in an explanation, jumped to and flashed.
+                            SettingJumpHost(navController)
+
+                            SnackbarHost(
+                                hostState = snackbarHostState,
+                                modifier = Modifier
+                                    .windowInsetsPadding(LocalPlayerAwareWindowInsets.current)
+                                    .align(Alignment.BottomCenter)
+                            )
+
+                            // Only after setup, so a crash during the wizard is offered once it is done.
+                            if (oobeStatus >= OOBE_VERSION) CrashReportDialog()
+
+                            // Setup wizard. Not when it is already on the back stack: a rotation
+                            // recreates the activity with the stack restored, wizard included, and
+                            // this ran again on top of it, so there were two, and Done on the top
+                            // one left the other showing with no way forward.
+                            LaunchedEffect(Unit) {
+                                val alreadyOpen = runCatching { navController.getBackStackEntry("setup_wizard") }.isSuccess
+                                if (oobeStatus < OOBE_VERSION && !alreadyOpen) {
+                                    navController.navigate("setup_wizard")
+                                }
+                            }
+
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    private fun setSystemBarAppearance(isDark: Boolean) {
+        WindowCompat.getInsetsController(window, window.decorView.rootView).apply {
+            isAppearanceLightStatusBars = !isDark
+            isAppearanceLightNavigationBars = !isDark
+        }
+
+        // sdk24 support
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) {
+            window.navigationBarColor = (if (isDark) Color.Transparent else Color.Black.copy(alpha = 0.2f)).toArgb()
+        }
+    }
+
+    companion object {
+        const val ACTION_SEARCH = "dev.skye.intertune.action.SEARCH"
+        const val ACTION_SONGS = "dev.skye.intertune.action.SONGS"
+        const val ACTION_ALBUMS = "dev.skye.intertune.action.ALBUMS"
+        const val ACTION_PLAYLISTS = "dev.skye.intertune.action.PLAYLISTS"
+        const val ACTION_PLAY_LIKED = "dev.skye.intertune.action.PLAY_LIKED"
+    }
+}
+
+/**
+ * A tab's name under its icon, on one line. It gets smaller before it is cut: in French at a
+ * large font size "Bibliothèque" was "Bibliothè…". The padding keeps a name that fills its tab
+ * off the edge of the screen and off the name beside it.
+ *
+ * The names of a bar ([names]) get smaller together: one tab in smaller letters than the three
+ * beside it read as a mistake.
+ */
+@Composable
+private fun TabLabel(text: String, names: SameTextSize) {
+    val autoSize = LocalTextStyle.current.shrinkToFit(smallest = 9.sp, text = text, row = names)
+    // Made again for each new autoSize: a Text does not see that one changed (see shrinkToFit).
+    key(autoSize) {
+        Text(
+            text = text,
+            autoSize = autoSize,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.padding(horizontal = 4.dp)
+        )
+    }
+}
+
+/**
+ * Navigate to a bottom-bar / rail tab that is not the one currently shown.
+ *
+ * The only subtlety is [restoreState]. The nav graph is flat, so every route is a sibling and
+ * there are no per-tab back stacks; `popUpTo(start) { saveState = true }` saves whatever was
+ * above the start destination, and `restoreState = true` puts it back.
+ *
+ * That is what upstream #959 was: from a playlist, tapping Library saved the stack and then
+ * immediately restored it, landing you back in the playlist. "Nothing happens."
+ *
+ * The fix there was a branch that called [NavHostController.navigateUp] whenever the current
+ * destination was not itself a tab. That escapes the sub-page, but it ignores *which* tab was
+ * tapped, so from History tapping Songs walked back to Home instead — upstream #1168.
+ *
+ * Restoring is only ever wanted when hopping between tab roots, where it preserves each tab's
+ * scroll position. Coming from a sub-page there is nothing worth restoring and restoring is
+ * precisely what breaks it. So: restore when leaving a tab, jump cleanly when leaving anything
+ * else. One rule, both issues.
+ */
+private fun navigateToNavTab(
+    navController: NavHostController,
+    route: String,
+    navigationItems: List<Screens>,
+    current: NavBackStackEntry?,
+) {
+    val leavingATab = navigationItems.any { scr ->
+        current?.destination?.hierarchy?.any { it.route == scr.route } == true
+    }
+    navController.navigate(route) {
+        popUpTo(navController.graph.startDestinationId) { saveState = true }
+        launchSingleTop = true
+        restoreState = leavingATab
+    }
+}
+
+/** Where a library launcher shortcut opens: [screen], and the Library filter to show there, if any. */
+internal data class LibraryShortcut(val screen: Screens, val filter: Screens.LibraryFilter?)
+
+/**
+ * The Songs, Albums and Playlists shortcuts open their own tab when the navigation bar has it,
+ * and otherwise Library showing that filter. Null for any other action.
+ */
+internal fun libraryShortcut(action: String?, navigationItems: List<Screens>): LibraryShortcut? {
+    val (tab, filter) = when (action) {
+        MainActivity.ACTION_SONGS -> Screens.Songs to Screens.LibraryFilter.SONGS
+        MainActivity.ACTION_ALBUMS -> Screens.Albums to Screens.LibraryFilter.ALBUMS
+        MainActivity.ACTION_PLAYLISTS -> Screens.Playlists to Screens.LibraryFilter.PLAYLISTS
+        else -> return null
+    }
+    return if (tab in navigationItems) LibraryShortcut(tab, null) else LibraryShortcut(Screens.Library, filter)
+}
+
+/**
+ * What to open for the intent that started the activity: its link, or the text it was shared
+ * with, which youtubeNavigator reads as a link or ignores. Null for a widget tap, which plays its
+ * own song, and for an intent started again from recents or restored with the activity, which
+ * would open an old link over whatever is on screen now.
+ */
+internal fun launchLink(action: String?, data: String?, text: String?, fromRecents: Boolean): String? =
+    if (fromRecents || action == WidgetCommands.ACTION_PLAY_SONG) null else data ?: text
+
+/**
+ * Whether a link handed to the app opens something the player, left open, would hide: a page of
+ * results (the song found on this phone's notification, the phone's own search), a library
+ * playlist, What you have heard (the notification of songs named once the phone was back online),
+ * a YouTube page, or a song's album or menu. Only a song to play at once is left to the player,
+ * which shows it whether it is open or not.
+ */
+internal fun linkOpensPage(link: String): Boolean {
+    if (SystemSearch.playlistOf(link) != null || SystemSearch.searchOf(link) != null || SystemSearch.isHeard(link)) return true
+    return when (val parsed = YouTubeLink.parse(link)) {
+        null -> false
+        is YouTubeLink.Video -> !parsed.playNow
+        else -> true
+    }
+}
+
+/**
+ * What to open for an intent handed to onNewIntent: taken the way [launchLink] takes it, with no
+ * recents check, because onNewIntent is only ever handed an intent that is arriving now.
+ */
+internal fun newIntentLink(action: String?, data: String?, text: String?): String? =
+    launchLink(action, data, text, fromRecents = false)
+
+/**
+ * The words of a play-from-search intent, empty when it names nothing ("play some music"), or
+ * null when the intent is not one. One that carries data is no request for words, and is left to
+ * the link handling (the YouTube link filters used to name the action as well).
+ */
+internal fun searchToPlay(action: String?, hasData: Boolean, query: String?): String? =
+    if (action == MediaStore.INTENT_ACTION_MEDIA_PLAY_FROM_SEARCH && !hasData) query?.trim().orEmpty() else null
+
+/** What a "play X" search came to: something to play, an answer with nothing in it, or no answer at all. */
+internal enum class PlaySearch { PLAY, NOTHING, FAILED }
+
+/**
+ * [found] songs, or null for a search the media session could not make (it failed, answered with
+ * an error, or was gone). Only an answer with nothing in it is "No results found".
+ */
+internal fun playSearchOutcome(found: Int?): PlaySearch = when {
+    found == null -> PlaySearch.FAILED
+    found == 0 -> PlaySearch.NOTHING
+    else -> PlaySearch.PLAY
+}
+
+/**
+ * A search as the media session takes one: no id, and the words in the request metadata. This is
+ * what media3 makes of "Hey Google, play X" in Android Auto, so
+ * MediaLibrarySessionCallback.onSetMediaItems plays it the same way, and empty words resume.
+ */
+internal fun searchPlayRequest(query: String): MediaItem = MediaItem.Builder()
+    .setRequestMetadata(MediaItem.RequestMetadata.Builder().setSearchQuery(query).build())
+    .build()
+
+/**
+ * Whether a found update should be pre-fetched: only with auto-install on, only when nothing else
+ * is using the installer, and never on F-Droid. A GitHub apk downloaded there can never be the one
+ * that installs, and the preference can still read true from an older build or a restored backup
+ * even though its switch is hidden there.
+ */
+internal fun updatePrefetchOwed(
+    autoInstall: Boolean,
+    fromFdroid: Boolean,
+    installerBusy: Boolean,
+    installerIdle: Boolean,
+): Boolean = autoInstall && !fromFdroid && !installerBusy && installerIdle
+
+
+val LocalDatabase = staticCompositionLocalOf<MusicDatabase> { error("No database provided") }
+val LocalMenuState = staticCompositionLocalOf<MenuState> { error("No menu state provided") }
+val LocalPlayerConnection = staticCompositionLocalOf<PlayerConnection?> { error("No PlayerConnection provided") }
+val LocalPlayerAwareWindowInsets = compositionLocalOf<WindowInsets> { error("No player WindowInsets provided") }
+val LocalDownloadUtil = staticCompositionLocalOf<DownloadUtil> { error("No DownloadUtil provided") }
+val LocalSyncUtils = staticCompositionLocalOf<SyncUtils> { error("No SyncUtils provided") }
+val LocalScrobbler = staticCompositionLocalOf<Scrobbler> { error("No Scrobbler provided") }
+val LocalLoudnessRepair = staticCompositionLocalOf<LoudnessRepair> { error("No LoudnessRepair provided") }
+val LocalUpdateChecker = staticCompositionLocalOf<UpdateChecker> { error("No UpdateChecker provided") }
+val LocalUpdateInstaller = staticCompositionLocalOf<UpdateInstaller> { error("No UpdateInstaller provided") }
+val LocalPollChecker = staticCompositionLocalOf<PollChecker> { error("No PollChecker provided") }
+val LocalActiveCount = staticCompositionLocalOf<ActiveCount> { error("No ActiveCount provided") }
+val LocalNetworkConnected = staticCompositionLocalOf<Boolean> { error("No Network Status provided") }
+val LocalSnackbarHostState = staticCompositionLocalOf<SnackbarHostState> { error("No SnackbarHostState provided") }
+
+/**
+ * Battery use in force (BatteryUse), for what is drawn: the playing bars, the player's background
+ * and the rows of Settings that Saver holds. Outside the activity's content, as a build without the
+ * choice runs, and otherwise the default.
+ */
+val LocalBatteryMode = compositionLocalOf { BatteryUse.modeOf(null, null, phoneSaver = false) }

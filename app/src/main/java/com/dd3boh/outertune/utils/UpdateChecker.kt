@@ -1,0 +1,304 @@
+/*
+ * Copyright (C) 2026 InterTune
+ *
+ * SPDX-License-Identifier: GPL-3.0
+ */
+
+package com.dd3boh.outertune.utils
+
+import android.content.Context
+import android.util.Log
+import androidx.datastore.preferences.core.edit
+import com.dd3boh.outertune.BuildConfig
+import com.dd3boh.outertune.constants.DismissedUpdateCodeKey
+import com.dd3boh.outertune.constants.LastUpdateCheckKey
+import com.dd3boh.outertune.constants.LastAssetSizeKey
+import com.dd3boh.outertune.constants.LastChangelogKey
+import com.dd3boh.outertune.constants.LastDownloadUrlKey
+import com.dd3boh.outertune.constants.LastReleaseUrlKey
+import com.dd3boh.outertune.constants.LastVersionCodeKey
+import com.dd3boh.outertune.constants.LastVersionKey
+import com.dd3boh.outertune.constants.UpdateAvailableKey
+import com.dd3boh.outertune.constants.UpdateCheckEnabledKey
+import com.dd3boh.outertune.extensions.isInternetConnected
+import dagger.hilt.android.qualifiers.ApplicationContext
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.withContext
+import okhttp3.OkHttpClient
+import okhttp3.Request
+import org.json.JSONObject
+import java.util.concurrent.TimeUnit
+import javax.inject.Inject
+import javax.inject.Singleton
+
+/**
+ * Tells the user when a newer InterTune release exists.
+ *
+ * This only ever reads a small JSON document. Fetching the new APK and handing it to Android's
+ * installer is [UpdateInstaller]'s, and a copy installed by an F-Droid client is pointed at its
+ * F-Droid page instead; see [InstallSource].
+ *
+ * Opt in. Nothing is fetched until the user turns it on, because a version check is a network
+ * request to a third party that reveals roughly when the app is used.
+ */
+@Singleton
+class UpdateChecker @Inject constructor(
+    @ApplicationContext private val context: Context,
+) {
+    data class Update(
+        val versionCode: Int,
+        val versionName: String,
+        /** The release page, for reading what changed. */
+        val releaseUrl: String,
+        /** The apk itself, for installing it without leaving the app. */
+        val downloadUrl: String,
+        /** Bytes, from the release metadata, so the download can show real progress. */
+        val sizeBytes: Long,
+        /** The release notes, shown in the prompt so the user knows what they are agreeing to. */
+        val changelog: String,
+    )
+
+    private val _available = MutableStateFlow<Update?>(null)
+
+    /** The newer release, if there is one the user has not already dismissed. */
+    val available: StateFlow<Update?> = _available.asStateFlow()
+
+    private val _lastCheckFailed = MutableStateFlow(false)
+
+    /**
+     * Whether the last check that asked GitHub got no usable answer: offline, a failed request, or
+     * a non-success status such as the 403 rate limit. Cleared once a check gets an answer, and
+     * left as it was by a check that returns early without asking (switched off, or inside the
+     * rate limit floor). The Updates screen reads it after a null result to choose between its two
+     * messages.
+     */
+    val lastCheckFailed: StateFlow<Boolean> = _lastCheckFailed.asStateFlow()
+
+    private val client by lazy {
+        OkHttpClient.Builder()
+            .connectTimeout(10, TimeUnit.SECONDS)
+            .readTimeout(10, TimeUnit.SECONDS)
+            .build()
+    }
+
+    /**
+     * Looks for a newer release.
+     *
+     * [force] skips the opt in and the rate limit, for the manual "check now" button. The automatic
+     * call on app open does not, because the GitHub API allows 60 unauthenticated requests an hour
+     * per IP and everyone behind one carrier NAT shares that budget.
+     */
+    suspend fun check(force: Boolean = false): Update? = withContext(Dispatchers.IO) {
+        // Debug builds only: the fake-update file stands in for a release, whatever the switch
+        // says, so the whole install can be tried on an emulator. See FAKE_UPDATE_FILE.
+        fakeUpdate()?.let { fake ->
+            _available.value = fake
+            return@withContext fake
+        }
+        // A fork never asks InterTune's releases: they are not its updates (FORKS.md).
+        if (!BuiltInKeys.official) return@withContext null
+        val store = context.dataStore
+        if (!force && !store.get(UpdateCheckEnabledKey, false)) return@withContext null
+        // Offline means the check could not be made, not that there is no update: show an update
+        // a previous check already found, and let lastCheckFailed tell the caller.
+        if (!context.isInternetConnected()) {
+            _lastCheckFailed.value = true
+            return@withContext restoreFromDisk()
+        }
+
+        val last = store.get(LastUpdateCheckKey, 0L)
+        val now = System.currentTimeMillis()
+        // A short floor rather than the old six hours. Opening the app should tell you the truth,
+        // and one request per launch is nothing against GitHub's unauthenticated budget. The floor
+        // only stops a pathological relaunch loop hammering it.
+        if (!force && now - last < MIN_CHECK_INTERVAL_MS) {
+            // Rebuild from disk rather than reporting the in-memory value. That value is null on
+            // every process start, so opening the app inside the six hour window used to answer
+            // "no update" even when one had already been found, and the Updates screen went blank.
+            return@withContext restoreFromDisk()
+        }
+
+        val body = runCatching {
+            client.newCall(
+                Request.Builder()
+                    .url(RELEASES_URL)
+                    .header("Accept", "application/vnd.github+json")
+                    .build()
+            ).execute().use { response ->
+                if (!response.isSuccessful) return@runCatching null
+                response.body?.string()
+            }
+        }.getOrNull() ?: run {
+            // A network that claims internet access can still fail here: a captive portal, a bad
+            // DNS answer, a timeout, GitHub's rate limit. Treated like offline.
+            Log.i(TAG, "Update check failed, leaving the last check time alone so it retries")
+            _lastCheckFailed.value = true
+            return@withContext restoreFromDisk()
+        }
+
+        // A request that reached here got a real answer, whatever it turns out to say.
+        _lastCheckFailed.value = false
+
+        // Only stamp the clock on a request that actually answered. Stamping on failure would make
+        // a single flaky moment suppress checks for the whole interval.
+        context.dataStore.edit { it[LastUpdateCheckKey] = now }
+
+        val update = runCatching { parse(body) }.getOrNull() ?: return@withContext null
+
+        if (update.versionCode <= BuildConfig.VERSION_CODE) {
+            clearAvailable()
+            return@withContext null
+        }
+
+        // Dismissing is per version, so a newer one still gets through.
+        if (update.versionCode == store.get(DismissedUpdateCodeKey, -1)) {
+            clearAvailable()
+            return@withContext null
+        }
+
+        // The whole result, not just the name. Without the code and the url a restart cannot
+        // rebuild what it found, and the rate limit below then reports "no update" until the next
+        // check.
+        context.dataStore.edit {
+            it[UpdateAvailableKey] = true
+            it[LastVersionKey] = update.versionName
+            it[LastVersionCodeKey] = update.versionCode
+            it[LastReleaseUrlKey] = update.releaseUrl
+            it[LastDownloadUrlKey] = update.downloadUrl
+            it[LastAssetSizeKey] = update.sizeBytes
+            it[LastChangelogKey] = update.changelog
+        }
+
+        Log.i(TAG, "Update available: ${update.versionName} (${update.versionCode})")
+        _available.value = update
+        update
+    }
+
+    /**
+     * The release found before: the one in hand, or else the one a check stored on the disk. For an
+     * install that was left waiting while the app was away, whose process may have been ended since:
+     * a check may not have answered yet, and never does while the checks are off.
+     */
+    suspend fun found(): Update? = _available.value ?: restoreFromDisk()
+
+    /**
+     * The last found release, read back from disk.
+     *
+     * Re-checked against the installed version and the dismissed one, so an update that was found,
+     * then installed or dismissed, does not come back from the dead after a restart.
+     */
+    private suspend fun restoreFromDisk(): Update? {
+        val store = context.dataStore
+        if (!store.get(UpdateAvailableKey, false)) return null
+        val code = store.get(LastVersionCodeKey, -1)
+        val name = store.get(LastVersionKey, "")
+        val url = store.get(LastReleaseUrlKey, "")
+        val apk = store.get(LastDownloadUrlKey, "")
+        if (code <= BuildConfig.VERSION_CODE || name.isEmpty() || url.isEmpty()) return null
+        if (code == store.get(DismissedUpdateCodeKey, -1)) return null
+
+        val restored = Update(
+            code, name, url, apk,
+            store.get(LastAssetSizeKey, 0L),
+            store.get(LastChangelogKey, ""),
+        )
+        _available.value = restored
+        return restored
+    }
+
+    /**
+     * A newer version than the one running, made up from the fake-update file: always null in a
+     * release. The apk is the one put in place by hand, so there is nothing to download.
+     */
+    private fun fakeUpdate(): Update? {
+        val bytes = fakeUpdateBytes(context) ?: return null
+        return Update(
+            versionCode = BuildConfig.VERSION_CODE + 1,
+            versionName = "${BuildConfig.VERSION_NAME}-test",
+            releaseUrl = "https://github.com/ItzSkyeYT/InterTune/releases",
+            downloadUrl = "",
+            sizeBytes = bytes,
+            changelog = "A test update from the fake-update file. Installing it puts the apk in the cache back over this build.",
+        )
+    }
+
+    /** Forgets the pending update entirely, for when it has been installed. */
+    suspend fun clearFound() = clearAvailable()
+
+    /** Stops this particular version being raised again. A later one still will be. */
+    suspend fun dismiss(versionCode: Int) {
+        context.dataStore.edit {
+            it[DismissedUpdateCodeKey] = versionCode
+            it[UpdateAvailableKey] = false
+        }
+        _available.value = null
+    }
+
+    private suspend fun clearAvailable() {
+        context.dataStore.edit { it[UpdateAvailableKey] = false }
+        _available.value = null
+    }
+
+    /**
+     * Reads the version out of the release JSON.
+     *
+     * The versionCode comes from the asset filename rather than the tag, because the tag is a
+     * human string ("v0.10.1-intertune.8", "v0.10.2") that does not sort or compare. The build
+     * writes the code into the filename, so it is the one number both sides agree on.
+     */
+    private fun parse(json: String): Update? {
+        val release = JSONObject(json)
+        if (release.optBoolean("draft") || release.optBoolean("prerelease")) return null
+
+        // Keep the asset itself, not just its version. The apk url and size are what let the app
+        // download and install the update rather than sending the user to a browser.
+        val assets = release.optJSONArray("assets") ?: return null
+        var code = -1
+        var downloadUrl = ""
+        var size = 0L
+        for (i in 0 until assets.length()) {
+            val asset = assets.getJSONObject(i)
+            val name = asset.optString("name")
+            val match = ASSET_VERSION_CODE.find(name) ?: continue
+            val assetCode = match.groupValues[1].toIntOrNull() ?: continue
+            if (assetCode > code) {
+                code = assetCode
+                downloadUrl = asset.optString("browser_download_url")
+                size = asset.optLong("size", 0L)
+            }
+        }
+        if (code < 0 || downloadUrl.isEmpty()) return null
+
+        return Update(
+            versionCode = code,
+            versionName = release.optString("tag_name").removePrefix("v"),
+            releaseUrl = release.optString("html_url"),
+            downloadUrl = downloadUrl,
+            sizeBytes = size,
+            changelog = release.optString("body"),
+        )
+    }
+
+    private companion object {
+        private const val TAG = "UpdateChecker"
+
+        private const val RELEASES_URL =
+            "https://api.github.com/repos/ItzSkyeYT/InterTune/releases/latest"
+
+        /** `InterTune-0.10.2-core-release-79.apk` -> 79 */
+        private val ASSET_VERSION_CODE = Regex("""-release-(\d+)\.apk$""")
+
+        /**
+         * Two minutes.
+         *
+         * Was six hours, which meant reopening the app usually told you nothing. A check is one
+         * small request and app launches are not frequent, so this now runs on essentially every
+         * open. The floor exists only so that something relaunching the activity in a loop cannot
+         * turn into a request storm.
+         */
+        private const val MIN_CHECK_INTERVAL_MS = 2 * 60 * 1000L
+    }
+}

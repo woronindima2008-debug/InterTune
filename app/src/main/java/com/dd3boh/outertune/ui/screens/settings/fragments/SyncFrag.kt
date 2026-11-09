@@ -1,0 +1,263 @@
+/*
+ * Copyright (C) 2025 O‌ute‌rTu‌ne Project
+ *
+ * SPDX-License-Identifier: GPL-3.0
+ *
+ * For any other attributions, refer to the git commit history
+ */
+package com.dd3boh.outertune.ui.screens.settings.fragments
+
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.core.FastOutLinearInEasing
+import androidx.compose.animation.core.LinearOutSlowInEasing
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.togetherWith
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.ColumnScope
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.Sync
+import androidx.compose.material.icons.rounded.SyncLock
+import androidx.compose.material.icons.rounded.SyncProblem
+import androidx.compose.material3.Checkbox
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.SnackbarDuration
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.unit.dp
+import com.dd3boh.outertune.LocalNetworkConnected
+import com.dd3boh.outertune.LocalSnackbarHostState
+import com.dd3boh.outertune.LocalSyncUtils
+import com.dd3boh.outertune.R
+import com.dd3boh.outertune.constants.InnerTubeCookieKey
+import com.dd3boh.outertune.constants.SyncConflictResolution
+import com.dd3boh.outertune.constants.SyncContent
+import com.dd3boh.outertune.constants.SyncMode
+import com.dd3boh.outertune.constants.YtmSyncConflictKey
+import com.dd3boh.outertune.constants.YtmSyncContentKey
+import com.dd3boh.outertune.constants.YtmSyncKey
+import com.dd3boh.outertune.constants.YtmSyncModeKey
+import com.dd3boh.outertune.constants.decodeSyncString
+import com.dd3boh.outertune.constants.encodeSyncString
+import com.dd3boh.outertune.ui.component.EnumListPreference
+import com.dd3boh.outertune.ui.component.PreferenceEntry
+import com.dd3boh.outertune.ui.dialog.InfoLabel
+import com.dd3boh.outertune.ui.component.SwitchPreference
+import com.dd3boh.outertune.utils.SyncResult
+import com.dd3boh.outertune.utils.SyncUtils
+import com.dd3boh.outertune.utils.rememberEnumPreference
+import com.dd3boh.outertune.utils.rememberPreference
+import com.zionhuang.innertube.utils.parseCookieString
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import com.dd3boh.outertune.ui.screens.walkthrough.Tour
+import com.dd3boh.outertune.ui.screens.settings.settingRow
+import com.dd3boh.outertune.ui.screens.walkthrough.tourTarget
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun ColumnScope.SyncAutoFrag() {
+    val (innerTubeCookie, onInnerTubeCookieChange) = rememberPreference(InnerTubeCookieKey, "")
+    val isLoggedIn = remember(innerTubeCookie) {
+        "SAPISID" in parseCookieString(innerTubeCookie)
+    }
+    val (ytmSync, onYtmSyncChange) = rememberPreference(YtmSyncKey, defaultValue = true)
+
+    SwitchPreference(
+        modifier = Modifier.tourTarget(Tour.SETTING_YTM_SYNC).settingRow(R.string.ytm_sync),
+        title = { Text(stringResource(R.string.ytm_sync)) },
+        icon = { Icon(Icons.Rounded.Sync, null) },
+        checked = ytmSync,
+        onCheckedChange = onYtmSyncChange,
+        isEnabled = isLoggedIn
+    )
+}
+
+@Composable
+fun ColumnScope.SyncManualFrag() {
+    val context = LocalContext.current
+    val coroutineScope = rememberCoroutineScope()
+    val isNetworkConnected = LocalNetworkConnected.current
+    val syncUtils = LocalSyncUtils.current
+    val snackbarHostState = LocalSnackbarHostState.current
+
+
+    val (innerTubeCookie, onInnerTubeCookieChange) = rememberPreference(InnerTubeCookieKey, "")
+    val isLoggedIn = remember(innerTubeCookie) {
+        "SAPISID" in parseCookieString(innerTubeCookie)
+    }
+    val (syncContent, onSyncContentChange) = rememberPreference(
+        YtmSyncContentKey,
+        defaultValue = SyncUtils.DEFAULT_SYNC_CONTENT
+    )
+
+    val isSyncingRemotePlaylists by syncUtils.isSyncingRemotePlaylists.collectAsState()
+    val isSyncingRemoteAlbums by syncUtils.isSyncingRemoteAlbums.collectAsState()
+    val isSyncingRemoteArtists by syncUtils.isSyncingRemoteArtists.collectAsState()
+    val isSyncingRemoteSongs by syncUtils.isSyncingRemoteSongs.collectAsState()
+    val isSyncingRemoteLikedSongs by syncUtils.isSyncingRemoteLikedSongs.collectAsState()
+    val isSyncingRecentActivity by syncUtils.isSyncingRecentActivity.collectAsState()
+
+    PreferenceEntry(
+        modifier = Modifier.settingRow(R.string.scanner_manual_btn),
+        title = { Text(stringResource(R.string.scanner_manual_btn)) },
+        icon = { Icon(Icons.Rounded.Sync, null) },
+        onClick = {
+            // Started on SyncUtils' own scope, not this composable's: leaving this screen used to
+            // cancel the sync itself part way, with no snackbar to say so, since it ran in
+            // rememberCoroutineScope here. Only awaiting the result to show it stays local; a
+            // fragment left before it resolves simply never shows the snackbar.
+            val syncResult = syncUtils.startManualSync()
+            coroutineScope.launch(Dispatchers.Main) {
+                // Shown while the sync runs, not before it: showSnackbar waits for the snackbar
+                // to go, so the sync used to start only once "Syncing" had timed out.
+                val active = launch {
+                    snackbarHostState.showSnackbar(
+                        message = context.getString(R.string.sync_progress_active),
+                        withDismissAction = true,
+                        duration = SnackbarDuration.Indefinite
+                    )
+                }
+                val result = syncResult.await()
+                active.cancel()
+                snackbarHostState.showSnackbar(
+                    message = context.getString(
+                        when (result) {
+                            SyncResult.SYNCED -> R.string.sync_progress_success
+                            SyncResult.FAILED -> R.string.sync_progress_failed
+                            SyncResult.BUSY -> R.string.sync_progress_busy
+                            SyncResult.NOTHING -> R.string.sync_progress_nothing
+                        }
+                    ),
+                    withDismissAction = true,
+                    duration = SnackbarDuration.Short
+                )
+            }
+        },
+        isEnabled = isLoggedIn && isNetworkConnected
+    )
+
+    val enabledContent = decodeSyncString(syncContent).sortedBy { it.name }
+    encodeSyncString(enabledContent.toList())
+    SyncContent.entries.filterNot { it == SyncContent.NULL }.forEach { item ->
+        Row(
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier.padding(horizontal = 48.dp, vertical = 4.dp)
+        ) {
+            val title = when (item) {
+                SyncContent.ALBUMS -> stringResource(R.string.albums)
+                SyncContent.ARTISTS -> stringResource(R.string.artists)
+                SyncContent.PLAYLISTS -> stringResource(R.string.playlists)
+                SyncContent.LIKED_SONGS -> stringResource(R.string.liked_songs)
+                SyncContent.PRIVATE_SONGS -> stringResource(R.string.songs)
+                SyncContent.RECENT_ACTIVITY -> stringResource(R.string.recent_activity)
+                else -> ""
+            }
+            val syncProgressIndicator = when (item) {
+                SyncContent.ALBUMS -> isSyncingRemoteAlbums
+                SyncContent.ARTISTS -> isSyncingRemoteArtists
+                SyncContent.PLAYLISTS -> isSyncingRemotePlaylists
+                SyncContent.LIKED_SONGS -> isSyncingRemoteLikedSongs
+                SyncContent.PRIVATE_SONGS -> isSyncingRemoteSongs
+                SyncContent.RECENT_ACTIVITY -> isSyncingRecentActivity
+                else -> false
+            }
+
+            // A swap, not a reveal, so this crossfades rather than expanding. Both branches
+            // already measure 48x48dp: the 14dp padding below is what matches the spinner to
+            // Checkbox's interactive minimum, so neither the row nor the label shifts.
+            AnimatedContent(
+                targetState = syncProgressIndicator,
+                transitionSpec = {
+                    fadeIn(tween(200, easing = LinearOutSlowInEasing))
+                        .togetherWith(fadeOut(tween(120, easing = FastOutLinearInEasing)))
+                },
+                label = "syncProgress"
+            ) { syncing ->
+                if (syncing) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.padding(14.dp)
+                    ) {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(20.dp),
+                            strokeWidth = 2.dp
+                        )
+                    }
+                } else {
+                    Checkbox(
+                        checked = enabledContent.contains(item),
+                        onCheckedChange = { checked ->
+                            val updated = enabledContent.toMutableList()
+                            if (checked) {
+                                updated.add(item)
+                            } else {
+                                updated.removeAll { it == item }
+                            }
+                            onSyncContentChange(encodeSyncString(updated))
+                        },
+                        enabled = isLoggedIn
+                    )
+                }
+            }
+            Text(
+                text = title,
+                style = MaterialTheme.typography.bodyLarge
+            )
+        }
+    }
+}
+
+@Composable
+fun ColumnScope.SyncParamsFrag() {
+    val (syncConflict, onSyncConflictChange) = rememberEnumPreference(
+        key = YtmSyncConflictKey,
+        defaultValue = SyncConflictResolution.ADD_ONLY
+    )
+    val (syncMode, onSyncModeChange) = rememberEnumPreference(key = YtmSyncModeKey, defaultValue = SyncMode.RW)
+
+    EnumListPreference(
+        modifier = Modifier.tourTarget(Tour.SETTING_SYNC_MODE).settingRow(R.string.sync_mode),
+        title = { Text(stringResource(R.string.sync_mode)) },
+        icon = { Icon(Icons.Rounded.SyncLock, null) },
+        selectedValue = syncMode,
+        onValueSelected = onSyncModeChange,
+        valueText = {
+            when (it) {
+                SyncMode.RO -> stringResource(R.string.sync_mode_ro)
+                SyncMode.RW -> stringResource(R.string.sync_mode_rw)
+            }
+        }
+    )
+    EnumListPreference(
+        modifier = Modifier.settingRow(R.string.sync_conflict_title),
+        title = { Text(stringResource(R.string.sync_conflict_title)) },
+        icon = { Icon(Icons.Rounded.SyncProblem, null) },
+        selectedValue = syncConflict,
+        onValueSelected = onSyncConflictChange,
+        valueText = {
+            when (it) {
+                SyncConflictResolution.ADD_ONLY -> stringResource(R.string.sync_conflict_add_only)
+                SyncConflictResolution.OVERWRITE_WITH_REMOTE -> stringResource(R.string.sync_conflict_overwrite)
+            }
+        },
+    )
+    InfoLabel(stringResource(R.string.sync_params_description))
+}
+

@@ -1,0 +1,693 @@
+package com.dd3boh.outertune.ui.screens
+
+import androidx.compose.foundation.layout.only
+import androidx.compose.foundation.layout.WindowInsetsSides
+import com.dd3boh.outertune.ui.menu.rememberArtistBlock
+import com.dd3boh.outertune.ui.menu.BlockedNote
+import com.dd3boh.outertune.constants.Unreleased
+import com.dd3boh.outertune.ui.component.ScreenBackHandler
+import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.background
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.core.Animatable
+import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.asPaddingValues
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.windowInsetsPadding
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.Album
+import androidx.compose.material.icons.rounded.Download
+import androidx.compose.material.icons.rounded.MoreVert
+import androidx.compose.material.icons.rounded.OfflinePin
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.Icon
+import androidx.compose.material3.LocalContentColor
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.Text
+import androidx.compose.material3.TopAppBarScrollBehavior
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateListOf
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.saveable.listSaver
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.toMutableStateList
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.LinkAnnotation
+import androidx.compose.ui.text.buildAnnotatedString
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.text.withLink
+import androidx.compose.ui.text.withStyle
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import androidx.compose.ui.util.fastForEachIndexed
+import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
+import androidx.media3.exoplayer.offline.Download
+import androidx.navigation.NavController
+import coil3.compose.AsyncImage
+import com.dd3boh.outertune.LocalDatabase
+import com.dd3boh.outertune.constants.PlayOrigin
+import com.dd3boh.outertune.LocalDownloadUtil
+import com.dd3boh.outertune.LocalMenuState
+import com.dd3boh.outertune.LocalNetworkConnected
+import com.dd3boh.outertune.LocalPlayerAwareWindowInsets
+import com.dd3boh.outertune.LocalPlayerConnection
+import com.dd3boh.outertune.LocalSnackbarHostState
+import com.dd3boh.outertune.R
+import com.dd3boh.outertune.constants.AlbumThumbnailSize
+import com.dd3boh.outertune.constants.ListThumbnailSize
+import com.dd3boh.outertune.constants.SwipeToQueueKey
+import com.dd3boh.outertune.constants.ThumbnailCornerRadius
+import com.dd3boh.outertune.db.entities.Album
+import com.dd3boh.outertune.models.toMediaMetadata
+import com.dd3boh.outertune.playback.queues.ListQueue
+import com.dd3boh.outertune.ui.component.AsyncImageLocal
+import com.dd3boh.outertune.ui.component.AutoResizeText
+import com.dd3boh.outertune.ui.component.FloatingFooter
+import com.dd3boh.outertune.ui.component.FloatingTopBar
+import com.dd3boh.outertune.ui.component.FontSizeRange
+import com.dd3boh.outertune.ui.component.LazyColumnScrollbar
+import com.dd3boh.outertune.ui.component.FailedNote
+import com.dd3boh.outertune.ui.component.KeptAlbumNote
+import com.dd3boh.outertune.ui.component.RetryWhenSignInChanges
+import com.dd3boh.outertune.utils.WhyStopped
+import com.dd3boh.outertune.viewmodels.keptAlbumNoteShown
+import com.dd3boh.outertune.ui.component.NavigationTitle
+import com.dd3boh.outertune.ui.component.SelectHeader
+import com.dd3boh.outertune.ui.component.button.IconButton
+import com.dd3boh.outertune.ui.component.items.SongListItem
+import com.dd3boh.outertune.ui.component.items.YouTubeGridItem
+import com.dd3boh.outertune.ui.component.shimmer.ButtonPlaceholder
+import com.dd3boh.outertune.ui.component.shimmer.ListItemPlaceHolder
+import com.dd3boh.outertune.ui.component.shimmer.ShimmerHost
+import com.dd3boh.outertune.ui.component.shimmer.TextPlaceholder
+import com.dd3boh.outertune.ui.menu.AlbumMenu
+import com.dd3boh.outertune.ui.menu.YouTubeAlbumMenu
+import com.dd3boh.outertune.ui.player.likeName
+import com.dd3boh.outertune.ui.player.named
+import com.dd3boh.outertune.ui.utils.getNSongsString
+import com.dd3boh.outertune.ui.utils.linkStylesWithFocus
+import com.dd3boh.outertune.utils.LocalArtworkPath
+import com.dd3boh.outertune.utils.getDownloadState
+import com.dd3boh.outertune.utils.joinByBullet
+import com.dd3boh.outertune.utils.rememberPreference
+import com.dd3boh.outertune.viewmodels.AlbumViewModel
+import kotlin.math.roundToInt
+import androidx.compose.foundation.lazy.LazyListScope
+import com.dd3boh.outertune.db.entities.AlbumWithSongs
+import com.dd3boh.outertune.ui.utils.HeaderBesideList
+import com.dd3boh.outertune.ui.utils.paneInsets
+import com.dd3boh.outertune.ui.utils.paneTop
+import com.dd3boh.outertune.ui.utils.rememberHeaderBeside
+import kotlinx.coroutines.delay
+
+@OptIn(ExperimentalFoundationApi::class, ExperimentalMaterial3Api::class)
+@Composable
+fun AlbumScreen(
+    navController: NavController,
+    scrollBehavior: TopAppBarScrollBehavior,
+    viewModel: AlbumViewModel = hiltViewModel(),
+) {
+    val haptic = LocalHapticFeedback.current
+    val context = LocalContext.current
+    val density = LocalDensity.current
+    val menuState = LocalMenuState.current
+    val database = LocalDatabase.current
+    val playerConnection = LocalPlayerConnection.current ?: return
+
+    val swipeEnabled by rememberPreference(SwipeToQueueKey, true)
+
+    val scope = rememberCoroutineScope()
+    val isPlaying by playerConnection.isPlaying.collectAsState()
+    val mediaMetadata by playerConnection.mediaMetadata.collectAsState()
+
+    val albumAsStored by viewModel.albumWithSongs.collectAsState()
+    // Without a blocked artist's songs, a feature on someone else's album (ArtistBlock); an album
+    // of theirs, opened from a link, is blank but for one line and Unblock.
+    val block = rememberArtistBlock()
+    val albumWithSongs = remember(albumAsStored, block) {
+        albumAsStored?.let { if (block.isEmpty) it else it.copy(songs = block.library(it.songs)) }
+    }
+    val blockedHere = if (Unreleased.ARTIST_BLOCK) albumAsStored?.artists?.firstNotNullOfOrNull { block.entry(it.id, it.name) } else null
+    if (blockedHere != null) {
+        Box(modifier = Modifier.fillMaxSize()) {
+            BlockedNote(
+                artist = blockedHere,
+                modifier = Modifier.windowInsetsPadding(LocalPlayerAwareWindowInsets.current.only(WindowInsetsSides.Horizontal + WindowInsetsSides.Top)),
+            )
+        }
+        FloatingTopBar(title = null, navController = navController)
+        return
+    }
+    val otherVersions by viewModel.otherVersions.collectAsState()
+    val state = rememberLazyListState()
+    val isLoading by viewModel.isLoading.collectAsState()
+    val failedKind by viewModel.failedKind.collectAsState()
+    val online = LocalNetworkConnected.current
+    // Signed in again from the note: the album the old sign-in failed is asked again.
+    RetryWhenSignInChanges(failed = failedKind != null, retry = viewModel::retry)
+
+    // The song a link opened the album on (youtubeNavigator): brought into view once, under the
+    // header and a third of the way down, and lit for a moment, so it is clear which one it was.
+    var shownDone by rememberSaveable { mutableStateOf(false) }
+    val shownLight = remember { Animatable(0f) }
+    LaunchedEffect(albumWithSongs?.songs?.size) {
+        val index = albumWithSongs?.songs?.indexOfFirst { it.id == viewModel.shownSong } ?: -1
+        if (shownDone || index < 0) return@LaunchedEffect
+        shownDone = true
+        state.animateScrollToItem(index + 1, -state.layoutInfo.viewportSize.height / 3)
+        shownLight.snapTo(1f)
+        delay(1200)
+        shownLight.animateTo(0f, tween(900))
+    }
+
+    // multiselect
+    var inSelectMode by rememberSaveable { mutableStateOf(false) }
+    val selection = rememberSaveable(
+        saver = listSaver<MutableList<String>, String>(
+            save = { it.toList() },
+            restore = { it.toMutableStateList() }
+        )
+    ) { mutableStateListOf() }
+    val onExitSelectionMode = {
+        inSelectMode = false
+        selection.clear()
+    }
+    if (inSelectMode) {
+        ScreenBackHandler(onBack = onExitSelectionMode)
+    }
+
+    val snackbarHostState = LocalSnackbarHostState.current
+
+    val downloadUtil = LocalDownloadUtil.current
+    var downloadState by remember {
+        mutableIntStateOf(Download.STATE_STOPPED)
+    }
+
+    LaunchedEffect(albumWithSongs) {
+        if (albumWithSongs?.album?.isLocal != false) return@LaunchedEffect
+        val songs = albumWithSongs?.songs?.filterNot { it.song.isLocal }?.map { it.id }
+        if (songs.isNullOrEmpty()) return@LaunchedEffect
+        downloadUtil.downloads.collect { downloads ->
+            downloadState = getDownloadState(songs.map { downloads[it] })
+        }
+    }
+
+    // The cover, the title and the buttons. Upright they are the first row of the list. On a
+    // phone on its side that row is all the window shows, and the songs start below its edge, so
+    // there it stands beside the list in a half of its own (Landscape.kt).
+    val header: @Composable (AlbumWithSongs) -> Unit = { albumWithSongsLocal ->
+        Column(
+            modifier = Modifier.padding(12.dp)
+        ) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                val thumbnailUrl = albumWithSongsLocal.album.thumbnailUrl
+                if (thumbnailUrl != null) {
+                    val px = (AlbumThumbnailSize.value * density.density).roundToInt()
+                    AsyncImage(
+                        model = if (thumbnailUrl.startsWith("/storage")) LocalArtworkPath(
+                            thumbnailUrl,
+                            px,
+                            px
+                        ) else thumbnailUrl,
+                        contentDescription = null,
+                        modifier = Modifier
+                            .size(AlbumThumbnailSize)
+                            .clip(RoundedCornerShape(ThumbnailCornerRadius))
+                    )
+                } else {
+                    // TODO: use painter fallback
+                    AsyncImageLocal(
+                        image = { null },
+                        placeholderIcon = Icons.Rounded.Album,
+                        modifier = Modifier
+                            .size(AlbumThumbnailSize)
+                            .clip(RoundedCornerShape(ThumbnailCornerRadius))
+                    )
+                }
+
+                Spacer(Modifier.width(16.dp))
+
+                Column(
+                    verticalArrangement = Arrangement.Center,
+                ) {
+                    AutoResizeText(
+                        text = albumWithSongsLocal.album.title,
+                        fontWeight = FontWeight.Bold,
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis,
+                        fontSizeRange = FontSizeRange(16.sp, 22.sp)
+                    )
+
+                    val linkStyles = linkStylesWithFocus()
+                    val annotatedString = buildAnnotatedString {
+                        withStyle(
+                            style = MaterialTheme.typography.titleMedium.copy(
+                                fontWeight = FontWeight.Normal,
+                                color = MaterialTheme.colorScheme.onBackground
+                            ).toSpanStyle()
+                        ) {
+                            albumWithSongsLocal.artists.fastForEachIndexed { index, artist ->
+                                withLink(
+                                    LinkAnnotation.Clickable(artist.id, linkStyles) {
+                                        navController.navigate("artist/${artist.id}")
+                                    }
+                                ) { append(artist.name) }
+                                if (index != albumWithSongsLocal.artists.lastIndex) {
+                                    append(", ")
+                                }
+                            }
+                        }
+                    }
+
+                    Text(annotatedString)
+
+                    Text(
+                        text = if (albumWithSongsLocal.album.year != null) {
+                            joinByBullet(
+                                getNSongsString(
+                                    albumWithSongsLocal.album.songCount,
+                                    albumWithSongsLocal.downloadCount
+                                ),
+                                albumWithSongsLocal.album.year.toString()
+                            )
+                        } else {
+                            getNSongsString(
+                                albumWithSongsLocal.album.songCount,
+                                albumWithSongsLocal.downloadCount
+                            )
+                        },
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Normal
+                    )
+
+                    Row {
+                        IconButton(
+                            onClick = {
+                                database.query {
+                                    update(albumWithSongsLocal.album.toggleLike())
+                                }
+                            }
+                        ) {
+                            Icon(
+                                painter = painterResource(if (albumWithSongsLocal.album.bookmarkedAt != null) R.drawable.favorite else R.drawable.favorite_border),
+                                contentDescription = likeName(albumWithSongsLocal.album.bookmarkedAt != null),
+                                tint = if (albumWithSongsLocal.album.bookmarkedAt != null) MaterialTheme.colorScheme.error else LocalContentColor.current
+                            )
+                        }
+
+                        if (albumWithSongsLocal.album.isLocal == false) {
+                            when (downloadState) {
+                                Download.STATE_COMPLETED -> {
+                                    IconButton(
+                                        onClick = {
+                                            albumWithSongsLocal.songs.forEach { song ->
+                                                downloadUtil.removeDownload(song.id)
+                                            }
+                                        }
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Rounded.OfflinePin,
+                                            contentDescription = stringResource(R.string.remove_download)
+                                        )
+                                    }
+                                }
+
+                                Download.STATE_DOWNLOADING -> {
+                                    IconButton(
+                                        onClick = {
+                                            albumWithSongsLocal.songs.forEach { song ->
+                                                downloadUtil.removeDownload(song.id)
+                                            }
+                                        },
+                                        // The wheel has no words of its own, so the button says what a tap on it does.
+                                        modifier = Modifier.named(stringResource(R.string.cancel_download))
+                                    ) {
+                                        CircularProgressIndicator(
+                                            strokeWidth = 2.dp,
+                                            modifier = Modifier.size(24.dp)
+                                        )
+                                    }
+                                }
+
+                                else -> {
+                                    IconButton(
+                                        onClick = {
+                                            val songs =
+                                                albumWithSongsLocal.songs.map { it.toMediaMetadata() }
+                                            downloadUtil.download(songs)
+                                        }
+                                    ) {
+                                        Icon(
+                                            Icons.Rounded.Download,
+                                            contentDescription = stringResource(R.string.action_download)
+                                        )
+                                    }
+                                }
+                            }
+                        }
+
+                        IconButton(
+                            onClick = {
+                                menuState.show {
+                                    AlbumMenu(
+                                        originalAlbum = Album(
+                                            albumWithSongsLocal.album,
+                                            albumWithSongsLocal.downloadCount,
+                                            albumWithSongsLocal.artists
+                                        ),
+                                        navController = navController,
+                                        onDismiss = menuState::dismiss,
+                                    )
+                                }
+                            }
+                        ) {
+                            Icon(
+                                Icons.Rounded.MoreVert,
+                                contentDescription = stringResource(R.string.options)
+                            )
+                        }
+                    }
+                }
+            }
+
+            Spacer(Modifier.height(12.dp))
+
+            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                Button(
+                    onClick = {
+                        playerConnection.playQueue(
+                            ListQueue(
+                                title = albumWithSongsLocal.album.title,
+                                items = albumWithSongs?.songs?.mapNotNull { it.toMediaMetadata() }?.toList()
+                                    ?: emptyList(),
+                                playlistId = albumWithSongsLocal.album.playlistId
+                            ),
+                            origin = PlayOrigin.ALBUM,
+                        )
+                    },
+                    contentPadding = ButtonDefaults.ButtonWithIconContentPadding,
+                    modifier = Modifier.weight(1f)
+                ) {
+                    Icon(
+                        painter = painterResource(R.drawable.play),
+                        contentDescription = null,
+                        modifier = Modifier.size(ButtonDefaults.IconSize)
+                    )
+                    Spacer(Modifier.size(ButtonDefaults.IconSpacing))
+                    Text(
+                        text = stringResource(R.string.play)
+                    )
+                }
+
+                OutlinedButton(
+                    onClick = {
+                        playerConnection.playQueue(
+                            ListQueue(
+                                title = albumWithSongsLocal.album.title,
+                                items = albumWithSongs?.songs?.mapNotNull { it.toMediaMetadata() }?.toList()
+                                    ?: emptyList(),
+                                playlistId = albumWithSongsLocal.album.playlistId,
+                                startShuffled = true,
+                            ),
+                            origin = PlayOrigin.ALBUM,
+                        )
+                    },
+                    contentPadding = ButtonDefaults.ButtonWithIconContentPadding,
+                    modifier = Modifier.weight(1f)
+                ) {
+                    Icon(
+                        painter = painterResource(R.drawable.shuffle_on),
+                        contentDescription = null,
+                        modifier = Modifier.size(ButtonDefaults.IconSize)
+                    )
+                    Spacer(Modifier.size(ButtonDefaults.IconSpacing))
+                    Text(stringResource(R.string.shuffle))
+                }
+            }
+        }
+    }
+    val twoPanes = rememberHeaderBeside()
+
+    val listContent: LazyListScope.() -> Unit = {
+        val albumWithSongsLocal = albumWithSongs
+        if (albumWithSongsLocal != null && albumWithSongsLocal.songs.isNotEmpty()) {
+            if (!twoPanes) {
+                item {
+                    header(albumWithSongsLocal)
+                }
+            } else {
+                paneTop()
+            }
+
+            // YouTube did not send the album, and these are the songs the library had: it stays
+            // as it is (AlbumViewModel), and says so here, with why when that is clear, and Retry.
+            val kept = failedKind
+            if (kept != null && keptAlbumNoteShown(kept, isLoading, online)) {
+                item(key = "not_refreshed") {
+                    KeptAlbumNote(
+                        kind = kept,
+                        onSignIn = { navController.navigate("login") },
+                        onRetry = viewModel::retry,
+                    )
+                }
+            }
+
+            val thumbnailSize = (ListThumbnailSize.value * density.density).roundToInt()
+            itemsIndexed(
+                items = albumWithSongs!!.songs,
+                key = { _, song -> song.id }
+            ) { index, song ->
+                SongListItem(
+                    song = song,
+                    albumIndex = index + 1,
+
+                    navController = navController,
+                    snackbarHostState = snackbarHostState,
+
+                    isActive = song.id == mediaMetadata?.id,
+                    // Only the playing row hears of play and pause (LibrarySongsScreen's rows too).
+                    isPlaying = song.id == mediaMetadata?.id && isPlaying,
+                    inSelectMode = inSelectMode,
+                    isSelected = selection.contains(song.id),
+                    onSelectedChange = {
+                        inSelectMode = true
+                        if (it) {
+                            selection.add(song.id)
+                        } else {
+                            selection.remove(song.id)
+                        }
+                    },
+                    swipeEnabled = swipeEnabled,
+
+                    thumbnailSize = thumbnailSize,
+                    onPlay = {
+                        playerConnection.playQueue(
+                            ListQueue(
+                                title = albumWithSongsLocal.album.title,
+                                items = albumWithSongsLocal.songs.map { it.toMediaMetadata() },
+                                startIndex = index,
+                                playlistId = albumWithSongsLocal.album.playlistId,
+                                songPicked = true,
+                            ),
+                            origin = PlayOrigin.ALBUM,
+                        )
+                    },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .animateItem()
+                        .then(
+                            if (song.id == viewModel.shownSong) Modifier.background(MaterialTheme.colorScheme.primary.copy(alpha = 0.18f * shownLight.value))
+                            else Modifier
+                        )
+                )
+            }
+
+            if (otherVersions.isNotEmpty()) {
+                item {
+                    NavigationTitle(
+                        title = stringResource(R.string.other_versions),
+                    )
+                }
+                item {
+                    LazyRow {
+                        items(
+                            items = otherVersions,
+                            key = { it.id },
+                        ) { item ->
+                            YouTubeGridItem(
+                                item = item,
+                                isActive = mediaMetadata?.album?.id == item.id,
+                                isPlaying = isPlaying,
+                                coroutineScope = scope,
+                                modifier = Modifier
+                                    .combinedClickable(
+                                        onClick = { navController.navigate("album/${item.id}") },
+                                        onLongClick = {
+                                            haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                            menuState.show {
+                                                YouTubeAlbumMenu(
+                                                    albumItem = item,
+                                                    navController = navController,
+                                                    onDismiss = menuState::dismiss,
+                                                )
+                                            }
+                                        },
+                                    )
+                                    .animateItem(),
+                            )
+                        }
+                    }
+                }
+            }
+        } else if (isLoading) {
+            item {
+                ShimmerHost {
+                    Column(Modifier.padding(12.dp)) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Spacer(
+                                modifier = Modifier
+                                    .size(AlbumThumbnailSize)
+                                    .clip(RoundedCornerShape(ThumbnailCornerRadius))
+                                    .background(MaterialTheme.colorScheme.onSurface)
+                            )
+
+                            Spacer(Modifier.width(16.dp))
+
+                            Column(
+                                verticalArrangement = Arrangement.Center,
+                            ) {
+                                TextPlaceholder()
+                                TextPlaceholder()
+                                TextPlaceholder()
+                            }
+                        }
+
+                        Spacer(Modifier.padding(8.dp))
+
+                        Row {
+                            ButtonPlaceholder(Modifier.weight(1f))
+
+                            Spacer(Modifier.width(12.dp))
+
+                            ButtonPlaceholder(Modifier.weight(1f))
+                        }
+                    }
+
+                    repeat(6) {
+                        ListItemPlaceHolder()
+                    }
+                }
+            }
+        } else if (albumWithSongsLocal?.album?.isLocal != true) {
+            // Not loading and no songs: YouTube refused the album or sent none. This was an empty
+            // page, and in South Korea every album was one, since YouTube keeps albums there for
+            // Premium members (#68).
+            item(key = "not_loaded") {
+                // And why, when it is clear: a sign-in YouTube no longer accepts, a connection that
+                // does not reach it, or the closed country (WhyStopped). Retry either way. An album
+                // that came back with no songs failed for no clear reason, which in a closed country
+                // is the country's, as before.
+                FailedNote(
+                    kind = failedKind ?: WhyStopped.Kind.OTHER,
+                    onSignIn = { navController.navigate("login") },
+                    onRetry = viewModel::retry,
+                )
+            }
+        }
+    }
+    if (twoPanes) {
+        HeaderBesideList(
+            header = { albumWithSongs?.takeIf { it.songs.isNotEmpty() }?.let { header(it) } },
+        ) { half ->
+            LazyColumn(
+                state = state,
+                // Just under the status bar: the back button floats over the other half, and
+                // there is no bar on this side for the songs to keep clear of.
+                contentPadding = paneInsets(underTopBar = false).asPaddingValues(),
+                modifier = half.padding(bottom = if (inSelectMode) 64.dp else 0.dp),
+                content = listContent,
+            )
+        }
+    } else {
+        LazyColumn(
+            state = state,
+            contentPadding = LocalPlayerAwareWindowInsets.current.asPaddingValues(),
+            modifier = Modifier.padding(bottom = if (inSelectMode) 64.dp else 0.dp),
+            content = listContent,
+        )
+    }
+    LazyColumnScrollbar(
+        state = state,
+    )
+
+    FloatingTopBar(title = null, navController = navController)
+
+    Box(
+        modifier = Modifier.fillMaxSize()
+    ) {
+        FloatingFooter(inSelectMode) {
+            val albumWithSongsLocal = albumWithSongs
+            if (albumWithSongsLocal != null && albumWithSongsLocal.songs.isNotEmpty()) {
+                SelectHeader(
+                    navController = navController,
+                    selectedItems = selection.mapNotNull { id ->
+                        albumWithSongsLocal.songs.find { it.song.id == id }
+                    }.map { it.toMediaMetadata() },
+                    totalItemCount = albumWithSongsLocal.songs.size,
+                    onSelectAll = {
+                        selection.clear()
+                        selection.addAll(albumWithSongsLocal.songs.map { it.id })
+                    },
+                    onDeselectAll = { selection.clear() },
+                    menuState = menuState,
+                    onDismiss = onExitSelectionMode
+                )
+            }
+        }
+        SnackbarHost(
+            hostState = snackbarHostState,
+            modifier = Modifier
+                .windowInsetsPadding(LocalPlayerAwareWindowInsets.current)
+                .align(Alignment.BottomCenter)
+        )
+    }
+}
