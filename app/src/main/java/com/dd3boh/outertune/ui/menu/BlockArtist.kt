@@ -36,6 +36,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import com.dd3boh.outertune.ui.utils.dpadFocusIndicator
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
@@ -162,8 +163,8 @@ fun BlockArtistConfirm(
             )
         },
         buttons = {
-            TextButton(onClick = onDismiss) { Text(stringResource(android.R.string.cancel)) }
-            TextButton(onClick = {
+            TextButton(modifier = Modifier.dpadFocusIndicator(), onClick = onDismiss) { Text(stringResource(android.R.string.cancel)) }
+            TextButton(modifier = Modifier.dpadFocusIndicator(), onClick = {
                 ArtistBlocking.block(context, artist)
                 onBlocked()
             }) { Text(stringResource(R.string.block_artist_confirm)) }

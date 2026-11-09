@@ -52,6 +52,7 @@ import androidx.media3.exoplayer.offline.Download
 import com.dd3boh.outertune.R
 import com.dd3boh.outertune.utils.getDownloadState
 import com.dd3boh.outertune.utils.makeTimeString
+import com.dd3boh.outertune.ui.utils.dpadFocusIndicator
 import java.time.LocalDateTime
 
 /**
@@ -109,6 +110,7 @@ fun LazyGridScope.GridMenuItem(
             verticalArrangement = Arrangement.spacedBy(GridMenuItemGap),
             modifier = modifier
                 .clip(ShapeDefaults.Large)
+                .dpadFocusIndicator(ShapeDefaults.Large)
                 .heightIn(min = GridMenuItemHeight)
                 .clickable(
                     enabled = enabled,
@@ -251,6 +253,7 @@ fun LazyGridScope.SleepTimerGridMenu(
             verticalArrangement = Arrangement.spacedBy(GridMenuItemGap),
             modifier = modifier
                 .clip(ShapeDefaults.Large)
+                .dpadFocusIndicator(ShapeDefaults.Large)
                 .heightIn(min = GridMenuItemHeight)
                 .clickable(
                     onClick = onClick

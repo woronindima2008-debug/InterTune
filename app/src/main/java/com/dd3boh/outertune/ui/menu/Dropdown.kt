@@ -29,6 +29,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
+import com.dd3boh.outertune.ui.utils.dpadFocusIndicator
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -53,6 +54,7 @@ fun ActionDropdown(
     Row(
         verticalAlignment = Alignment.CenterVertically,
         modifier = modifier
+            .dpadFocusIndicator()
             .clickable(
                 onClick = {
                     menuExpanded = true
@@ -101,6 +103,7 @@ fun ActionDropdown(
                         }
                     } else {
                         DropdownMenuItem(
+                            modifier = Modifier.dpadFocusIndicator(),
                             leadingIcon = item.leadingIcon,
                             text = {
                                 Text(

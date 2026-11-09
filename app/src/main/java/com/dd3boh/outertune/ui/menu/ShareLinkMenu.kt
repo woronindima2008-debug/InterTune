@@ -41,6 +41,7 @@ import com.dd3boh.outertune.utils.ShareLinkKind
 import com.dd3boh.outertune.utils.ShareLinks
 import com.dd3boh.outertune.utils.rememberEnumPreference
 import com.dd3boh.outertune.utils.shareSheet
+import com.dd3boh.outertune.ui.utils.dpadFocusIndicator
 
 /**
  * Shares a song or an album the way "Links you share" says. Call the result from a click, with
@@ -123,6 +124,6 @@ private fun ShareLinkRow(icon: ImageVector, title: Int, description: Int, onClic
         supportingContent = { Text(stringResource(description)) },
         leadingContent = { Icon(icon, contentDescription = null) },
         colors = ListItemDefaults.colors(containerColor = Color.Transparent),
-        modifier = Modifier.clickable(onClick = onClick)
+        modifier = Modifier.dpadFocusIndicator().clickable(onClick = onClick)
     )
 }
