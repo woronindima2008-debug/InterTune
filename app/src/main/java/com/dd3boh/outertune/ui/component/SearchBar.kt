@@ -266,11 +266,11 @@ fun SearchBar(
                     end = endPadding
                 )
                 .size(width = width, height = height)
-                // Keep the search surface in D-pad overlay traversal in BOTH states.
-                // After Back closes the keyboard/full-screen search, the focused search field
-                // must still hand Down to the first visible item on every destination screen;
-                // the screen-wide D-pad search handles that transition across focus groups.
-                .dpadOverlay()
+                // The expanded search is a floating overlay. As soon as Back closes it,
+                // remove the overlay boundary even while its closing animation is running:
+                // otherwise the still-full-screen animated surface hides every page target
+                // from the D-pad geometry search and Down appears to do nothing.
+                .then(if (active) Modifier.dpadOverlay() else Modifier)
                 .then(if (glass != null && animationProgress < 1f) Modifier.floatingGlass(glass, animatedShape) else Modifier)
         ) {
             Column {
