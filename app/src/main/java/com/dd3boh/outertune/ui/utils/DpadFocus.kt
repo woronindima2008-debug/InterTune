@@ -21,6 +21,8 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.ProvidedValue
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.withFrameNanos
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
@@ -63,6 +65,7 @@ import androidx.compose.ui.unit.toSize
 import java.util.concurrent.atomic.AtomicInteger
 import kotlin.math.abs
 import kotlin.math.max
+import kotlinx.coroutines.launch
 
 /*
  * Keypad and D-pad navigation.
@@ -526,9 +529,13 @@ private class Focusable(val node: SemanticsNode, val bounds: Rect, val overlay: 
  * [dpadWrapsToTabs]), as it does from the topmost floating controls. From one that covers the
  * screen, Up with nothing above is taken and goes nowhere (see [dpadCoversScreen]).
  */
-fun Modifier.dpadOverlayEscape(tvNavigation: Boolean = false): Modifier = composed {
+fun Modifier.dpadOverlayEscape(
+    tvNavigation: Boolean = false,
+    onSearchDown: (() -> Boolean)? = null,
+): Modifier = composed {
     val view = LocalView.current
     val focusManager = LocalFocusManager.current
+    val scope = rememberCoroutineScope()
     val anythingFocused = remember { BooleanArray(1) }
     onFocusEvent { anythingFocused[0] = it.hasFocus }.onPreviewKeyEvent { event ->
         if (event.type != KeyEventType.KeyDown) return@onPreviewKeyEvent false
@@ -552,6 +559,24 @@ fun Modifier.dpadOverlayEscape(tvNavigation: Boolean = false): Modifier = compos
             // hand Down directly to the screen-wide geometry search so the first visible
             // destination item below the search receives focus.
             if (direction == DpadDirection.Down && focusedEditable) {
+                // The app-wide search owns Back separately from the IME. Handle Down here,
+                // before the search field or the still-animating overlay can consume it:
+                // dismiss the search surface, wait for its semantics to leave, then focus
+                // the first visible destination below it.
+                if (onSearchDown?.invoke() == true) {
+                    scope.launch {
+                        withFrameNanos { }
+                        if (!moveFromOverlay(
+                                owner.unmergedRootSemanticsNode,
+                                DpadDirection.Down,
+                                fromAnywhere = true,
+                            )
+                        ) {
+                            focusManager.moveFocus(FocusDirection.Down)
+                        }
+                    }
+                    return@onPreviewKeyEvent true
+                }
                 return@onPreviewKeyEvent when (
                     moveFromOverlay(owner.unmergedRootSemanticsNode, direction, fromAnywhere = true)
                 ) {
