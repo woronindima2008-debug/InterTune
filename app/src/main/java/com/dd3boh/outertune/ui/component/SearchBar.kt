@@ -279,7 +279,7 @@ fun SearchBar(
                 // remove the overlay boundary even while its closing animation is running:
                 // otherwise the still-full-screen animated surface hides every page target
                 // from the D-pad geometry search and Down appears to do nothing.
-                .then(if (BuildConfig.BUILD_TYPE == "tv" && active) Modifier.dpadOverlay() else Modifier)
+                .then(if (BuildConfig.BUILD_TYPE == "tv") Modifier.dpadOverlay() else Modifier)
                 .then(if (glass != null && animationProgress < 1f) Modifier.floatingGlass(glass, animatedShape) else Modifier)
         ) {
             Column {

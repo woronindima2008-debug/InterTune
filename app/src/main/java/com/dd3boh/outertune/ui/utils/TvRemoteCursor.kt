@@ -8,6 +8,7 @@ package com.dd3boh.outertune.ui.utils
 
 import android.os.SystemClock
 import android.view.KeyEvent
+import android.view.InputDevice
 import android.view.MotionEvent
 import android.view.View
 import androidx.compose.runtime.getValue
@@ -52,6 +53,10 @@ internal class DoubleCenterPressDetector(
         return false
     }
 }
+
+/** Smaller repeat steps keep held D-pad movement smooth on TV air-mice. */
+internal fun tvCursorStepDp(repeatCount: Int): Float =
+    if (repeatCount <= 0) 24f else 12f
 
 /**
  * Activity-owned pointer state. Key events are handled by MainActivity, not Compose focus,
@@ -118,7 +123,7 @@ class TvRemoteCursorState {
 
         val view = targetView
         val density = view?.resources?.displayMetrics?.density ?: 1f
-        val step = 32f * density
+        val step = tvCursorStepDp(event.repeatCount) * density
         when (direction) {
             0 -> position = Offset(position.x, (position.y - step).coerceAtLeast(0f))
             1 -> position = Offset(position.x, (position.y + step).coerceAtMost((size.height - 1).coerceAtLeast(0).toFloat()))
@@ -135,8 +140,29 @@ class TvRemoteCursorState {
         val x = position.x.coerceIn(0f, (size.width - 1).coerceAtLeast(0).toFloat())
         val y = position.y.coerceIn(0f, (size.height - 1).coerceAtLeast(0).toFloat())
         val downTime = SystemClock.uptimeMillis()
-        val down = MotionEvent.obtain(downTime, downTime, MotionEvent.ACTION_DOWN, x, y, 0)
-        val up = MotionEvent.obtain(downTime, downTime + 1L, MotionEvent.ACTION_UP, x, y, 0)
+        val properties = arrayOf(
+            MotionEvent.PointerProperties().apply {
+                id = 0
+                toolType = MotionEvent.TOOL_TYPE_MOUSE
+            }
+        )
+        val coordinates = arrayOf(
+            MotionEvent.PointerCoords().apply {
+                this.x = x
+                this.y = y
+                pressure = 1f
+                size = 1f
+            }
+        )
+        // Use mouse-shaped events, not touchscreen/finger events, for reliable Compose mouse clicks.
+        val down = MotionEvent.obtain(
+            downTime, downTime, MotionEvent.ACTION_DOWN, 1, properties, coordinates,
+            0, MotionEvent.BUTTON_PRIMARY, 1f, 1f, 0, 0, InputDevice.SOURCE_MOUSE, 0
+        )
+        val up = MotionEvent.obtain(
+            downTime, downTime + 16L, MotionEvent.ACTION_UP, 1, properties, coordinates,
+            0, 0, 1f, 1f, 0, 0, InputDevice.SOURCE_MOUSE, 0
+        )
         try {
             view.dispatchTouchEvent(down)
             view.dispatchTouchEvent(up)
