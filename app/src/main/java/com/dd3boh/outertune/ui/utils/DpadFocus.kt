@@ -556,8 +556,13 @@ fun Modifier.dpadOverlayEscape(tvNavigation: Boolean = false): Modifier = compos
                     moveFromOverlay(owner.unmergedRootSemanticsNode, direction, fromAnywhere = true)
                 ) {
                     DpadMove.Moved -> true
-                    DpadMove.NotOurs -> false
-                    DpadMove.NothingThere -> scrollListInstead(view, direction)
+                    // If no visible geometric target is available (for example, the page
+                    // is still composing its first row), give Compose one native focus pass.
+                    // This is deliberately a fallback, not the first attempt: the search field
+                    // must not trap Down inside its own focus group.
+                    DpadMove.NotOurs -> focusManager.moveFocus(FocusDirection.Down)
+                    DpadMove.NothingThere -> scrollListInstead(view, direction) ||
+                        focusManager.moveFocus(FocusDirection.Down)
                     DpadMove.Covered -> true
                 }
             }
