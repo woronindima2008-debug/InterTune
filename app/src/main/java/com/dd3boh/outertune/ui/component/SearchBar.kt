@@ -66,9 +66,11 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.focus.FocusDirection
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Shape
@@ -77,10 +79,13 @@ import androidx.compose.ui.graphics.takeOrElse
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.onKeyEvent
+import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalLayoutDirection
+import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
@@ -96,7 +101,9 @@ import androidx.compose.ui.util.lerp
 import com.dd3boh.outertune.constants.AppBarHeight
 import com.dd3boh.outertune.constants.BackAnimationsKey
 import com.dd3boh.outertune.utils.rememberPreference
+import com.dd3boh.outertune.ui.utils.DpadDirection
 import com.dd3boh.outertune.ui.utils.dpadOverlay
+import com.dd3boh.outertune.ui.utils.moveDpadFocusFromAnywhere
 import kotlinx.coroutines.launch
 import kotlin.coroutines.cancellation.CancellationException
 import kotlin.math.max
@@ -350,6 +357,9 @@ private fun SearchBarInputField(
 ) {
     val searchSemantics = "Search" // getString(Strings.SearchBarSearch) R.string.m3c_search_bar_search
     val suggestionsAvailableSemantics = "Suggestions below" // getString(Strings.SuggestionsAvailable) R.string.m3c_suggestions_available
+    val focusManager = LocalFocusManager.current
+    val view = LocalView.current
+    val scope = rememberCoroutineScope()
     val textColor = LocalTextStyle.current.color.takeOrElse {
         colors.focusedTextColor
     }
@@ -386,6 +396,24 @@ private fun SearchBarInputField(
                     contentDescription = searchSemantics
                     if (active) {
                         stateDescription = suggestionsAvailableSemantics
+                    }
+                }
+                .onPreviewKeyEvent { event ->
+                    // Back from the TV IME can hide only the keyboard, leaving this full-screen
+                    // search active and the text field focused. Down is the user's next step into
+                    // the page: close the search surface, wait until it leaves the semantics tree,
+                    // then retry the move against the now-visible page.
+                    if (active && event.type == KeyEventType.KeyDown && event.key == Key.DirectionDown) {
+                        scope.launch {
+                            onActiveChange(false)
+                            withFrameNanos { }
+                            if (!moveDpadFocusFromAnywhere(view, DpadDirection.Down)) {
+                                focusManager.moveFocus(FocusDirection.Down)
+                            }
+                        }
+                        true
+                    } else {
+                        false
                     }
                 }
                 .onKeyEvent {
