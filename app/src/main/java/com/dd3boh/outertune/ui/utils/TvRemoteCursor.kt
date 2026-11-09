@@ -18,7 +18,6 @@ import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.key
-import androidx.compose.ui.input.key.nativeKeyEvent
 import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.type
 import androidx.compose.ui.layout.onSizeChanged
@@ -84,11 +83,6 @@ fun Modifier.tvRemoteCursor(toggleVersion: Int): Modifier = composed {
             ) return@onPreviewKeyEvent false
 
             if (event.type != KeyEventType.KeyDown) return@onPreviewKeyEvent true
-            if (event.nativeKeyEvent.repeatCount > 0 &&
-                key != Key.DirectionUp && key != Key.DirectionDown &&
-                key != Key.DirectionLeft && key != Key.DirectionRight
-            ) return@onPreviewKeyEvent true
-
             when (key) {
                 Key.DirectionUp -> position = Offset(position.x, (position.y - step).coerceAtLeast(0f))
                 Key.DirectionDown -> position = Offset(position.x, (position.y + step).coerceAtMost(size.height.toFloat()))
