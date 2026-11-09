@@ -1959,7 +1959,7 @@ class MainActivity : ComponentActivity() {
                                 .dpadOverlayEscape(
                                     tvNavigation = BuildConfig.BUILD_TYPE == "tv",
                                     onSearchDown = {
-                                        if (searchActive && WindowInsets.ime.getBottom(LocalDensity.current) == 0) {
+                                        if (searchActive && ViewCompat.getRootWindowInsets(window.decorView)?.isVisible(WindowInsetsCompat.Type.ime()) != true) {
                                             searchActive = false
                                             true
                                         } else false
