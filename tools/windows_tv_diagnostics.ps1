@@ -76,6 +76,8 @@ Invoke-Adb @("-s",$Serial,"shell","rm",$remoteShot) | Out-Null
 
 Write-Host "Diagnostic report: $reportPath" -ForegroundColor Green
 Write-Host "Local screenshot (not uploaded): $shotPath" -ForegroundColor Green
+Write-Host "`n=== DIAGNOSTIC REPORT ===" -ForegroundColor Cyan
+Get-Content -Path $reportPath -Raw
 $consent = Read-Host "Upload this filtered text report to the PUBLIC InterTune GitHub repository? Type YES"
 if ($consent -cne "YES") { Write-Host "Upload skipped; nothing was sent." -ForegroundColor Yellow; exit 0 }
 
