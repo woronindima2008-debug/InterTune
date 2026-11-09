@@ -6,6 +6,7 @@
 
 package com.dd3boh.outertune.ui.screens
 
+import com.dd3boh.outertune.ui.utils.dpadFocusIndicator
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -133,13 +134,13 @@ fun UpdateOptInCard() {
                         .fillMaxWidth()
                         .padding(top = 12.dp)
                 ) {
-                    TextButton(onClick = { answer(false) }) {
+                    TextButton(modifier = Modifier.dpadFocusIndicator(), onClick = { answer(false) }) {
                         Text(stringResource(R.string.oobe_update_check_no))
                     }
 
                     Spacer(Modifier.width(8.dp))
 
-                    Button(onClick = { answer(true) }) {
+                    Button(modifier = Modifier.dpadFocusIndicator(), onClick = { answer(true) }) {
                         Text(stringResource(R.string.oobe_update_check_yes))
                     }
                 }
@@ -223,13 +224,13 @@ fun PollsOptInCard() {
                         .fillMaxWidth()
                         .padding(top = 12.dp)
                 ) {
-                    TextButton(onClick = { answer(false) }) {
+                    TextButton(modifier = Modifier.dpadFocusIndicator(), onClick = { answer(false) }) {
                         Text(stringResource(R.string.polls_opt_in_no))
                     }
 
                     Spacer(Modifier.width(8.dp))
 
-                    Button(onClick = { answer(true) }) {
+                    Button(modifier = Modifier.dpadFocusIndicator(), onClick = { answer(true) }) {
                         Text(stringResource(R.string.polls_opt_in_yes))
                     }
                 }
@@ -294,13 +295,13 @@ fun NewsOptInCard() {
                         .fillMaxWidth()
                         .padding(top = 12.dp)
                 ) {
-                    TextButton(onClick = { answer(false) }) {
+                    TextButton(modifier = Modifier.dpadFocusIndicator(), onClick = { answer(false) }) {
                         Text(stringResource(R.string.polls_opt_in_no))
                     }
 
                     Spacer(Modifier.width(8.dp))
 
-                    Button(onClick = { answer(true) }) {
+                    Button(modifier = Modifier.dpadFocusIndicator(), onClick = { answer(true) }) {
                         Text(stringResource(R.string.news_opt_in_yes))
                     }
                 }
@@ -367,13 +368,13 @@ fun UsageCountOptInCard() {
                         .fillMaxWidth()
                         .padding(top = 12.dp)
                 ) {
-                    TextButton(onClick = { answer(false) }) {
+                    TextButton(modifier = Modifier.dpadFocusIndicator(), onClick = { answer(false) }) {
                         Text(stringResource(R.string.polls_opt_in_no))
                     }
 
                     Spacer(Modifier.width(8.dp))
 
-                    Button(onClick = { answer(true) }) {
+                    Button(modifier = Modifier.dpadFocusIndicator(), onClick = { answer(true) }) {
                         Text(stringResource(R.string.usage_count_opt_in_yes))
                     }
                 }
@@ -456,13 +457,13 @@ fun LastFmSimilarOptInCard() {
                         .fillMaxWidth()
                         .padding(top = 12.dp)
                 ) {
-                    TextButton(onClick = { answer(false) }) {
+                    TextButton(modifier = Modifier.dpadFocusIndicator(), onClick = { answer(false) }) {
                         Text(stringResource(R.string.polls_opt_in_no))
                     }
 
                     Spacer(Modifier.width(8.dp))
 
-                    Button(onClick = { answer(true) }) {
+                    Button(modifier = Modifier.dpadFocusIndicator(), onClick = { answer(true) }) {
                         Text(stringResource(R.string.lastfm_opt_in_yes))
                     }
                 }

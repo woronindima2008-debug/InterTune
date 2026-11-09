@@ -1,5 +1,6 @@
 package com.dd3boh.outertune.ui.screens.search
 
+import com.dd3boh.outertune.ui.utils.dpadFocusIndicator
 import androidx.compose.foundation.interaction.DragInteraction
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -141,6 +142,7 @@ fun LocalSearchScreen(
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .height(ListItemHeight)
+                                .dpadFocusIndicator()
                                 .clickable { viewModel.filter.value = filter }
                                 .padding(start = 12.dp, end = 18.dp)
                         ) {

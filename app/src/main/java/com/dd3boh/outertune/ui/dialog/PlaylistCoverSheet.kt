@@ -324,6 +324,7 @@ private fun ChoiceCell(
                 if (wide) Modifier.widthIn(min = tile + CellMargin * 2, max = 168.dp).width(IntrinsicSize.Max)
                 else Modifier.width(tile + CellMargin * 2)
             )
+            .dpadFocusIndicator(RoundedCornerShape(radius + CellMargin))
             .clip(RoundedCornerShape(radius + CellMargin))
             .selectable(selected = selected, onClick = onClick, role = Role.RadioButton)
             .padding(CellMargin)

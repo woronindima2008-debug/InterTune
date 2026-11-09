@@ -9,6 +9,7 @@
 
 package com.dd3boh.outertune.ui.player
 
+import com.dd3boh.outertune.BuildConfig
 import com.dd3boh.outertune.playback.PlayerConnection
 import com.dd3boh.outertune.playback.BatteryUse
 import com.dd3boh.outertune.LocalBatteryMode
@@ -759,7 +760,7 @@ fun BottomSheetPlayer(
     // mini player never pays for it, and a no-op below API 33.
     BottomSheet(
         state = state,
-        modifier = modifier.dpadOverlay(),
+        modifier = modifier.then(if (BuildConfig.BUILD_TYPE == "tv") Modifier.dpadOverlay() else Modifier),
         background = {
             Log.v(TAG, "PLR-2.1")
             Box(

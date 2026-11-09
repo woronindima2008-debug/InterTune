@@ -8,6 +8,7 @@
 
 package com.dd3boh.outertune.ui.screens
 
+import com.dd3boh.outertune.ui.utils.dpadFocusIndicator
 import android.content.Intent
 import android.net.Uri
 import androidx.activity.compose.BackHandler
@@ -633,6 +634,7 @@ fun SetupWizard(
                                     horizontalArrangement = Arrangement.spacedBy(4.dp)
                                 ) {
                                     TextButton(
+                                        modifier = Modifier.dpadFocusIndicator(),
                                         onClick = {
                                             restoreLauncher.launch(arrayOf("application/octet-stream"))
                                         },
@@ -652,6 +654,7 @@ fun SetupWizard(
                                     }
 
                                     TextButton(
+                                        modifier = Modifier.dpadFocusIndicator(),
                                         onClick = {
                                             finishSetup()
                                         }
@@ -933,7 +936,7 @@ fun SetupWizard(
 
                                         // add folder button
                                         Column {
-                                            Button(onClick = { dirPickerLauncher.launch(null) }) {
+                                            Button(modifier = Modifier.dpadFocusIndicator(), onClick = { dirPickerLauncher.launch(null) }) {
                                                 Text(stringResource(R.string.scan_paths_add_folder))
                                             }
 
@@ -1050,6 +1053,7 @@ private fun OobeNavButton(
     val disabledContent = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f)
     if (glass == null) {
         FloatingActionButton(
+            modifier = Modifier.dpadFocusIndicator(FloatingActionButtonDefaults.shape),
             onClick = onClick,
             containerColor = if (enabled) FloatingActionButtonDefaults.containerColor
             else MaterialTheme.colorScheme.surfaceColorAtElevation(NavigationBarDefaults.Elevation),
@@ -1064,8 +1068,8 @@ private fun OobeNavButton(
     val shape = FloatingActionButtonDefaults.shape
     FloatingActionButton(
         onClick = onClick,
-        modifier = if (enabled) Modifier.floatingGlass(glass, shape, glass.buttonTint())
-        else Modifier.floatingGlass(glass, shape),
+        modifier = (if (enabled) Modifier.floatingGlass(glass, shape, glass.buttonTint())
+        else Modifier.floatingGlass(glass, shape)).dpadFocusIndicator(shape),
         shape = shape,
         containerColor = Color.Transparent,
         contentColor = if (enabled) MaterialTheme.colorScheme.onPrimaryContainer else disabledContent,

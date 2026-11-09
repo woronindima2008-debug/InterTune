@@ -34,7 +34,7 @@ class ForkGuardTest {
             "utils/Donors.kt" to "if (!BuiltInKeys.official) return@withContext emptyList()",
             "ui/component/ProblemReportDialog.kt" to "if (BuiltInKeys.official) TextButton(",
             "ui/component/CrashReportDialog.kt" to "if (BuiltInKeys.official) TextButton(",
-            "ui/dialog/SupportDialog.kt" to "if (BuiltInKeys.official) TextButton(onClick = {",
+            "ui/dialog/SupportDialog.kt" to "if (BuiltInKeys.official) TextButton(",
             "utils/ReportRelay.kt" to "if (!BuiltInKeys.official) return@withContext Outcome.Failed(",
             "ui/menu/ShareLinkMenu.kt" to "if (Unreleased.SHARE_PAGE && BuiltInKeys.official) chosen else ShareLinkKind.YOUTUBE_MUSIC",
             "ui/screens/settings/fragments/PlayerFrag.kt" to "HEAD_TRACKING_ISSUE).takeIf { BuiltInKeys.official }",

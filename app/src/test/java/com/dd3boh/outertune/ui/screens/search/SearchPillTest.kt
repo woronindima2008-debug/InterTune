@@ -36,4 +36,12 @@ class SearchPillTest {
         assertTrue(searchPillLeadsBack(searchActive = false, route = "search/{query}"))
         assertTrue(searchPillLeadsBack(searchActive = false, route = "search"))
     }
+
+    @Test
+    fun `closing search preserves the focus origin only for TV keyboard navigation`() {
+        assertFalse(shouldClearSearchFocus(isTvBuild = true, keyboardMode = true))
+        assertTrue(shouldClearSearchFocus(isTvBuild = true, keyboardMode = false))
+        assertTrue(shouldClearSearchFocus(isTvBuild = false, keyboardMode = true))
+        assertTrue(shouldClearSearchFocus(isTvBuild = false, keyboardMode = false))
+    }
 }

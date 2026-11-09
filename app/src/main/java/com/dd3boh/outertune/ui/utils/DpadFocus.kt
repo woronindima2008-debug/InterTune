@@ -6,6 +6,7 @@
 
 package com.dd3boh.outertune.ui.utils
 
+import com.dd3boh.outertune.BuildConfig
 import android.view.View
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.LocalIndication
@@ -141,12 +142,23 @@ fun Modifier.dpadOverlay(): Modifier = semantics { dpadOverlay = true }.composed
  * It is deliberately driven by keyboard input mode, so touch use keeps the original appearance.
  * Apply it to the clickable surface (not just its icon) so the whole target is visibly selected.
  */
+internal fun shouldShowDpadFocusIndicator(
+    isTvBuild: Boolean,
+    keyboardMode: Boolean,
+    focused: Boolean,
+): Boolean = isTvBuild && keyboardMode && focused
+
 fun Modifier.dpadFocusIndicator(shape: Shape = RoundedCornerShape(12.dp)): Modifier = composed {
     val keyboardMode = LocalInputModeManager.current.inputMode == InputMode.Keyboard
     var focused by remember { mutableStateOf(false) }
+    val showIndicator = shouldShowDpadFocusIndicator(
+        isTvBuild = BuildConfig.BUILD_TYPE == "tv",
+        keyboardMode = keyboardMode,
+        focused = focused,
+    )
     onFocusChanged { focused = it.isFocused }
         .then(
-            if (keyboardMode && focused) {
+            if (showIndicator) {
                 Modifier.border(2.dp, MaterialTheme.colorScheme.primary, shape)
             } else {
                 Modifier

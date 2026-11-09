@@ -6,6 +6,7 @@
 
 package com.dd3boh.outertune.ui.screens
 
+import com.dd3boh.outertune.ui.utils.dpadFocusIndicator
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.material.icons.rounded.Add
 import androidx.compose.material.icons.rounded.LibraryAdd
@@ -479,6 +480,7 @@ fun RecognitionScreen(
             ) {
                 SingleChoiceSegmentedButtonRow(Modifier.fillMaxWidth()) {
                     SegmentedButton(
+                        modifier = Modifier.dpadFocusIndicator(),
                         selected = !fromPhone,
                         onClick = { fromPhone = false },
                         enabled = !listening,
@@ -486,6 +488,7 @@ fun RecognitionScreen(
                         icon = { Icon(Icons.Rounded.Mic, contentDescription = null) },
                     ) { Text(stringResource(R.string.recognition_source_room)) }
                     SegmentedButton(
+                        modifier = Modifier.dpadFocusIndicator(),
                         selected = fromPhone,
                         onClick = { fromPhone = true },
                         enabled = !listening,
@@ -685,7 +688,7 @@ fun RecognitionScreen(
             item(key = "mix_dismiss/$id") {
                 TextButton(
                     onClick = { viewModel.dismissMix(choice) },
-                    modifier = Modifier.padding(horizontal = 8.dp),
+                    modifier = Modifier.padding(horizontal = 8.dp).dpadFocusIndicator(),
                 ) {
                     Text(stringResource(R.string.recognise_mix_dismiss))
                 }
@@ -710,7 +713,7 @@ fun RecognitionScreen(
                     )
                     // Empties the list and leaves any listening alone. It went through reset, which
                     // also stopped a Keep listening running in the background.
-                    TextButton(onClick = { viewModel.clearRecognised() }) {
+                    TextButton(modifier = Modifier.dpadFocusIndicator(), onClick = { viewModel.clearRecognised() }) {
                         Text(stringResource(R.string.recognise_clear_history))
                     }
                 }
@@ -725,7 +728,7 @@ fun RecognitionScreen(
                         horizontalArrangement = Arrangement.spacedBy(8.dp),
                         modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp),
                     ) {
-                        FilledTonalButton(onClick = { proposeSave() }, modifier = Modifier.weight(1f)) {
+                        FilledTonalButton(onClick = { proposeSave() }, modifier = Modifier.weight(1f).dpadFocusIndicator()) {
                             Icon(
                                 Icons.AutoMirrored.Rounded.PlaylistAdd,
                                 contentDescription = null,
@@ -734,7 +737,7 @@ fun RecognitionScreen(
                             Spacer(Modifier.width(8.dp))
                             Text(stringResource(R.string.create_playlist), maxLines = 1)
                         }
-                        FilledTonalButton(onClick = { addAllToPlaylist = true }, modifier = Modifier.weight(1f)) {
+                        FilledTonalButton(onClick = { addAllToPlaylist = true }, modifier = Modifier.weight(1f).dpadFocusIndicator()) {
                             Icon(
                                 Icons.Rounded.LibraryAdd,
                                 contentDescription = null,
@@ -859,6 +862,7 @@ private fun ListenButton(
             contentAlignment = Alignment.Center,
             modifier = Modifier
                 .size(diameter)
+                .dpadFocusIndicator(CircleShape)
                 .clip(CircleShape)
                 .background(container)
                 .clickable(onClick = onClick),
@@ -1084,10 +1088,12 @@ private fun CandidateRow(
                 }
                 DropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
                     DropdownMenuItem(
+                        modifier = Modifier.dpadFocusIndicator(),
                         text = { Text(stringResource(R.string.recognise_play)) },
                         onClick = { menuOpen = false; onPlay() },
                     )
                     DropdownMenuItem(
+                        modifier = Modifier.dpadFocusIndicator(),
                         text = { Text(stringResource(R.string.add_to_playlist)) },
                         onClick = { menuOpen = false; onAddToPlaylist() },
                     )

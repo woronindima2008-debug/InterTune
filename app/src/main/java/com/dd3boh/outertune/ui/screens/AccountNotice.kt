@@ -6,6 +6,7 @@
 
 package com.dd3boh.outertune.ui.screens
 
+import com.dd3boh.outertune.ui.utils.dpadFocusIndicator
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.height
@@ -58,7 +59,7 @@ fun AccountNoticeDialog(onDone: () -> Unit) {
             )
         },
         buttons = {
-            TextButton(onClick = onDone) {
+            TextButton(modifier = Modifier.dpadFocusIndicator(), onClick = onDone) {
                 Text(stringResource(R.string.announcement_done))
             }
         },

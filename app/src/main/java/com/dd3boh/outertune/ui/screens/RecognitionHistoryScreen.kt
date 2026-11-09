@@ -6,6 +6,7 @@
 
 package com.dd3boh.outertune.ui.screens
 
+import com.dd3boh.outertune.ui.utils.dpadFocusIndicator
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.asPaddingValues
@@ -145,6 +146,7 @@ private fun HeardRow(entry: Heard, onOpen: () -> Unit) {
     Column(
         modifier = Modifier
             .fillMaxWidth()
+            .dpadFocusIndicator()
             .clickable(onClick = onOpen)
             .padding(horizontal = 16.dp, vertical = 12.dp)
     ) {

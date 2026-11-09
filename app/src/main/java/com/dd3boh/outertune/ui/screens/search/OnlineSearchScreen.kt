@@ -1,5 +1,6 @@
 package com.dd3boh.outertune.ui.screens.search
 
+import com.dd3boh.outertune.ui.utils.dpadFocusIndicator
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
@@ -324,6 +325,7 @@ fun SuggestionItem(
         modifier = modifier
             .fillMaxWidth()
             .height(SuggestionItemHeight)
+            .dpadFocusIndicator()
             .clickable(onClick = onClick)
             .padding(end = SearchBarIconOffsetX)
     ) {

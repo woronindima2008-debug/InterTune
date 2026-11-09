@@ -478,16 +478,17 @@ class MainActivity : ComponentActivity() {
     /**
      * Handle TV remote input before Android routes it to the currently focused Compose child.
      * This makes pointer movement and OK independent of the focus tree on every app screen.
-     * Two consecutive OK presses toggle the pointer; Back is left to Android and Compose.
+     * Two consecutive OK presses toggle the pointer; Back exits pointer mode before normal handling.
      */
     override fun dispatchKeyEvent(event: KeyEvent): Boolean {
         if (BuildConfig.BUILD_TYPE != "tv") return super.dispatchKeyEvent(event)
 
         // Cursor clicks are synthesized as touch events, which switches Compose to touch mode.
         // Restore keyboard mode whenever the physical remote is used outside pointer mode.
-        if (!tvRemoteCursor.enabled && event.action == KeyEvent.ACTION_DOWN) {
-            tvRemoteCursor.requestKeyboardMode()
-        } else if (event.keyCode == KeyEvent.KEYCODE_BACK && event.action == KeyEvent.ACTION_DOWN) {
+        if (event.keyCode == KeyEvent.KEYCODE_BACK && event.action == KeyEvent.ACTION_DOWN) {
+            // Back exits pointer mode, then continues through the normal Android/Compose path.
+            tvRemoteCursor.disable()
+        } else if (!tvRemoteCursor.enabled && event.action == KeyEvent.ACTION_DOWN) {
             tvRemoteCursor.requestKeyboardMode()
         }
 

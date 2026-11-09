@@ -11,6 +11,7 @@
 
 package com.dd3boh.outertune.ui.component
 
+import com.dd3boh.outertune.BuildConfig
 import androidx.compose.ui.input.key.type
 import androidx.compose.ui.input.key.KeyEventType
 import android.annotation.SuppressLint
@@ -278,7 +279,7 @@ fun SearchBar(
                 // remove the overlay boundary even while its closing animation is running:
                 // otherwise the still-full-screen animated surface hides every page target
                 // from the D-pad geometry search and Down appears to do nothing.
-                .then(if (active) Modifier.dpadOverlay() else Modifier)
+                .then(if (BuildConfig.BUILD_TYPE == "tv" && active) Modifier.dpadOverlay() else Modifier)
                 .then(if (glass != null && animationProgress < 1f) Modifier.floatingGlass(glass, animatedShape) else Modifier)
         ) {
             Column {
@@ -368,7 +369,7 @@ private fun SearchBarInputField(
     // Opening search from a TV remote is a focus transition, not a touch. Move focus into the
     // editable field after it has been placed so the TV keyboard appears and typed input is ready.
     LaunchedEffect(active) {
-        if (active) {
+        if (BuildConfig.BUILD_TYPE == "tv" && active) {
             withFrameNanos { }
             runCatching { focusRequester.requestFocus() }
         }
@@ -414,7 +415,7 @@ private fun SearchBarInputField(
                     // search active and the text field focused. Down is the user's next step into
                     // the page: close the search surface, wait until it leaves the semantics tree,
                     // then retry the move against the now-visible page.
-                    if (active && event.type == KeyEventType.KeyDown && event.key == Key.DirectionDown) {
+                    if (BuildConfig.BUILD_TYPE == "tv" && active && event.type == KeyEventType.KeyDown && event.key == Key.DirectionDown) {
                         scope.launch {
                             onActiveChange(false)
                             // The full-screen suggestions remain composed during the 300 ms

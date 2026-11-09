@@ -6,6 +6,7 @@
 
 package com.dd3boh.outertune.ui.screens
 
+import com.dd3boh.outertune.ui.utils.dpadFocusIndicator
 import android.os.Build
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
@@ -235,6 +236,7 @@ fun OptInCatchUp(
                             .widthIn(max = 560.dp)
                             .fillMaxWidth()
                             .padding(horizontal = 24.dp, vertical = 16.dp)
+                            .dpadFocusIndicator()
                     ) {
                         Text(stringResource(R.string.catch_up_done))
                     }

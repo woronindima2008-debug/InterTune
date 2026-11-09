@@ -95,6 +95,12 @@ class TvRemoteCursorState {
         if (!enabled) requestKeyboardMode()
     }
 
+    /** Explicitly leave pointer mode; unlike toggle(), this can never turn it on. */
+    fun disable() {
+        enabled = false
+        requestKeyboardMode()
+    }
+
     fun onKeyEvent(event: KeyEvent): Boolean {
         if (!enabled) return false
         val direction = when (event.keyCode) {

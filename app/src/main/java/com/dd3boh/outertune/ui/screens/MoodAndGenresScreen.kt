@@ -1,5 +1,6 @@
 package com.dd3boh.outertune.ui.screens
 
+import com.dd3boh.outertune.ui.utils.dpadFocusIndicator
 import android.content.res.Configuration.ORIENTATION_LANDSCAPE
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -116,6 +117,7 @@ fun MoodAndGenresButton(
         contentAlignment = Alignment.CenterStart,
         modifier = modifier
             .height(MoodAndGenresButtonHeight)
+            .dpadFocusIndicator(RoundedCornerShape(6.dp))
             .clip(RoundedCornerShape(6.dp))
             .background(MaterialTheme.colorScheme.surfaceColorAtElevation(6.dp))
             .clickable(onClick = onClick)

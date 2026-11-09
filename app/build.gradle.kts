@@ -414,6 +414,12 @@ dependencies {
     // sdk24 support
     // Support for N is officially unsupported even it the app should still work. Leave this outside of the version catalog.
     implementation("androidx.webkit:webkit:1.14.0")
+
+    // Compose UI tests exercise actual D-pad focus traversal on an Android TV emulator.
+    androidTestImplementation("androidx.compose.ui:ui-test-junit4:1.9.4")
+    androidTestImplementation("androidx.test.ext:junit:1.2.1")
+    androidTestImplementation("androidx.test:runner:1.6.2")
+    tvImplementation("androidx.compose.ui:ui-test-manifest:1.9.4")
 }
 
 afterEvaluate {

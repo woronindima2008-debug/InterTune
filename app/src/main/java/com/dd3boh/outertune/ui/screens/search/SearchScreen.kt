@@ -1,5 +1,8 @@
 package com.dd3boh.outertune.ui.screens.search
 
+import androidx.compose.ui.platform.LocalInputModeManager
+import androidx.compose.ui.input.InputMode
+import com.dd3boh.outertune.BuildConfig
 import com.dd3boh.outertune.ui.utils.dpadOverlay
 import android.util.Log
 import androidx.compose.animation.AnimatedVisibility
@@ -96,6 +99,9 @@ import com.dd3boh.outertune.ui.screens.walkthrough.tourTarget
 fun searchPillLeadsBack(searchActive: Boolean, route: String?): Boolean =
     searchActive || route?.startsWith("search") == true
 
+internal fun shouldClearSearchFocus(isTvBuild: Boolean, keyboardMode: Boolean): Boolean =
+    !isTvBuild || !keyboardMode
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SearchBarContainer(
@@ -110,6 +116,7 @@ fun SearchBarContainer(
     val database = LocalDatabase.current
     val menuState = LocalMenuState.current
     val focusManager = LocalFocusManager.current
+    val inputModeManager = LocalInputModeManager.current
     val playerConnection = LocalPlayerConnection.current
 
     val enabledTabs by rememberPreference(EnabledTabsKey, defaultValue = DEFAULT_ENABLED_TABS)
@@ -138,7 +145,13 @@ fun SearchBarContainer(
     val onSearchActiveChange: (Boolean) -> Unit = { newActive ->
         onActiveChange(newActive)
         if (!newActive) {
-            focusManager.clearFocus()
+            // Keep the search field as the geometric origin for TV D-pad handoff. Clearing it
+            // first makes the global search choose the screen's top-left target instead.
+            if (shouldClearSearchFocus(
+                    isTvBuild = BuildConfig.BUILD_TYPE == "tv",
+                    keyboardMode = inputModeManager.inputMode == InputMode.Keyboard,
+                )
+            ) focusManager.clearFocus()
             if (navigationItems.fastAny { it.route == navBackStackEntry?.destination?.route }) {
                 onQueryChange(TextFieldValue())
             }
@@ -202,7 +215,7 @@ fun SearchBarContainer(
     ) {
         SearchBar(
             // The pill, which grows to the whole screen while searching, floats over the page.
-            pillModifier = Modifier.tourTarget(Tour.SEARCH_BAR).dpadOverlay(),
+            pillModifier = Modifier.tourTarget(Tour.SEARCH_BAR).then(if (BuildConfig.BUILD_TYPE == "tv") Modifier.dpadOverlay() else Modifier),
             closedMaxWidth = if (LocalLandscape.current.active) Landscape.PanelMaxWidth else Dp.Unspecified,
             query = query,
             onQueryChange = onQueryChange,

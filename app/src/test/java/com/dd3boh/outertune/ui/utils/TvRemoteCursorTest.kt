@@ -65,4 +65,17 @@ class TvRemoteCursorTest {
         assertFalse(detector.onPress(1_700L))
         assertTrue(detector.onPress(2_000L))
     }
+
+    @Test
+    fun `explicit disable leaves pointer mode off and never toggles it back on`() {
+        val cursor = TvRemoteCursorState()
+        cursor.toggle()
+        assertTrue(cursor.enabled)
+
+        cursor.disable()
+        assertFalse(cursor.enabled)
+
+        cursor.disable()
+        assertFalse(cursor.enabled)
+    }
 }

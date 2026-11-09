@@ -154,6 +154,14 @@ class DpadFocusTest {
         assertFalse(dpadPivots(containerSize = 384f, windowWidth = 900f))
     }
 
+    @Test
+    fun `visible focus feedback is limited to focused TV keyboard controls`() {
+        assertTrue(shouldShowDpadFocusIndicator(isTvBuild = true, keyboardMode = true, focused = true))
+        assertFalse(shouldShowDpadFocusIndicator(isTvBuild = false, keyboardMode = true, focused = true))
+        assertFalse(shouldShowDpadFocusIndicator(isTvBuild = true, keyboardMode = false, focused = true))
+        assertFalse(shouldShowDpadFocusIndicator(isTvBuild = true, keyboardMode = true, focused = false))
+    }
+
     private fun scrollFor(offset: Float) = dpadScrollDistance(offset, 96f, 640f)
 
     @Test

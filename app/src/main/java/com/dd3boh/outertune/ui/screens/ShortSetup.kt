@@ -6,6 +6,7 @@
 
 package com.dd3boh.outertune.ui.screens
 
+import com.dd3boh.outertune.ui.utils.dpadFocusIndicator
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -609,7 +610,8 @@ private fun SetupNavButton(
         else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f),
         elevation = if (enabled) FloatingActionButtonDefaults.elevation()
         else FloatingActionButtonDefaults.elevation(0.dp, 0.dp, 0.dp, 0.dp),
-        modifier = if (enabled) Modifier else Modifier.semantics { disabled() },
+        modifier = (if (enabled) Modifier else Modifier.semantics { disabled() })
+            .dpadFocusIndicator(FloatingActionButtonDefaults.shape),
         content = content,
     )
 }
@@ -928,6 +930,7 @@ private fun SetupButton(
         .fillMaxWidth()
         .then(modifier)
         .heightIn(min = 48.dp)
+        .dpadFocusIndicator()
     val padding = if (narrow) PaddingValues(horizontal = 12.dp, vertical = 8.dp) else ButtonDefaults.ContentPadding
     val label: @Composable () -> Unit = {
         if (busy) {
@@ -1249,6 +1252,7 @@ private fun SetupAnswerButton(
 ) {
     val button = modifier
         .heightIn(min = 52.dp)
+        .dpadFocusIndicator()
         .semantics { contentDescription = spoken }
     // Less of a margin than a button has by itself: half a card is not much room for two words.
     val margin = PaddingValues(horizontal = 12.dp, vertical = 8.dp)

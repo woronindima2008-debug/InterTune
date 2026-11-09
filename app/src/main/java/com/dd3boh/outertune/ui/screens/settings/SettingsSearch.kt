@@ -6,6 +6,8 @@
 
 package com.dd3boh.outertune.ui.screens.settings
 
+import com.dd3boh.outertune.ui.utils.dpadFocusIndicator
+import com.dd3boh.outertune.BuildConfig
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -95,7 +97,7 @@ internal fun SettingsSearchField(
         modifier = modifier
             // Treat the settings search as a small floating control so Down can jump
             // directly to the first visible setting even when Compose focus groups intervene.
-            .dpadOverlay()
+            .then(if (BuildConfig.BUILD_TYPE == "tv") Modifier.dpadOverlay() else Modifier)
             .fillMaxWidth()
             .heightIn(min = 52.dp)
             .clip(CircleShape)
@@ -114,6 +116,7 @@ internal fun SettingsSearchField(
             keyboardActions = KeyboardActions(onSearch = { focus.clearFocus() }),
             modifier = Modifier
                 .weight(1f)
+                .dpadFocusIndicator()
                 .padding(vertical = 14.dp)
                 .semantics { contentDescription = placeholder },
             decorationBox = { field ->
@@ -205,6 +208,7 @@ internal fun SettingsSearchPaneResults(
                 horizontalArrangement = Arrangement.spacedBy(14.dp),
                 modifier = Modifier
                     .fillMaxWidth()
+                    .dpadFocusIndicator(shape)
                     .clip(shape)
                     .background(if (chosen) MaterialTheme.colorScheme.secondaryContainer else Color.Transparent)
                     .selectable(selected = chosen, role = Role.Button, onClick = { onPick(hit) })

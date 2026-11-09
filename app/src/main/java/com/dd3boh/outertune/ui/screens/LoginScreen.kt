@@ -1,5 +1,6 @@
 package com.dd3boh.outertune.ui.screens
 
+import com.dd3boh.outertune.ui.utils.dpadFocusIndicator
 import android.accounts.Account
 import android.accounts.AccountManager
 import android.annotation.SuppressLint
@@ -651,11 +652,11 @@ private fun LoginAccountRow(email: String, onSwitch: () -> Unit, onAnotherAccoun
             overflow = TextOverflow.Ellipsis,
             modifier = Modifier.weight(1f),
         )
-        TextButton(onClick = onSwitch) {
+        TextButton(modifier = Modifier.dpadFocusIndicator(), onClick = onSwitch) {
             Text(stringResource(if (email.isNotEmpty()) R.string.login_switch_account else R.string.login_pick_account))
         }
         if (email.isNotEmpty()) {
-            TextButton(onClick = onAnotherAccount) {
+            TextButton(modifier = Modifier.dpadFocusIndicator(), onClick = onAnotherAccount) {
                 Text(stringResource(R.string.login_another_account))
             }
         }
@@ -734,7 +735,7 @@ private fun LoginSignedInRow(name: String?, onDone: () -> Unit) {
                 overflow = TextOverflow.Ellipsis,
                 modifier = Modifier.weight(1f),
             )
-            TextButton(onClick = onDone) {
+            TextButton(modifier = Modifier.dpadFocusIndicator(), onClick = onDone) {
                 Text(stringResource(R.string.action_done))
             }
         }

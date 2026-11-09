@@ -6,6 +6,7 @@
 
 package com.dd3boh.outertune.ui.component
 
+import com.dd3boh.outertune.ui.utils.dpadFocusIndicator
 import android.Manifest
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -245,7 +246,7 @@ fun RecognitionSheet(
                         else shazamWaitMessage(retryAt?.takeIf { continuous }),
                     )
                     Spacer24()
-                    OutlinedButton(onClick = { viewModel.stop(); onDismiss() }) {
+                    OutlinedButton(modifier = Modifier.dpadFocusIndicator(), onClick = { viewModel.stop(); onDismiss() }) {
                         Text(stringResource(R.string.recognition_stop))
                     }
                 }
@@ -301,6 +302,7 @@ fun RecognitionSheet(
                 modifier = Modifier
                     .padding(top = 24.dp)
                     .fillMaxWidth()
+                    .dpadFocusIndicator()
                     // the row is the switch, so a screen reader reads its words and whether it is on as one
                     .toggleable(value = continuous, role = Role.Switch, onValueChange = { viewModel.setContinuous(it) })
             ) {
@@ -579,7 +581,7 @@ private fun Found(
                     maxLines = 1,
                 )
             }
-            Button(onClick = { onAdd(candidate) }, contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 16.dp)) {
+            Button(modifier = Modifier.dpadFocusIndicator(), onClick = { onAdd(candidate) }, contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 16.dp)) {
                 Icon(Icons.Rounded.Add, null, modifier = Modifier.size(18.dp))
                 Text(stringResource(R.string.recognition_add), modifier = Modifier.padding(start = 6.dp))
             }
@@ -587,7 +589,7 @@ private fun Found(
     }
 
     Spacer24()
-    TextButton(onClick = onRetry) { Text(stringResource(R.string.recognition_listen_again)) }
+    TextButton(modifier = Modifier.dpadFocusIndicator(), onClick = onRetry) { Text(stringResource(R.string.recognition_listen_again)) }
 }
 
 /**
@@ -632,7 +634,7 @@ internal fun Elsewhere(run: SheetRun.Other, listenHere: String, note: String?, o
         )
         Spacer24()
     }
-    Button(onClick = onListenHere) { Text(listenHere) }
+    Button(modifier = Modifier.dpadFocusIndicator(), onClick = onListenHere) { Text(listenHere) }
 }
 
 @Composable
@@ -660,5 +662,5 @@ private fun Problem(text: String, onRetry: () -> Unit, icon: ImageVector = Icons
         color = MaterialTheme.colorScheme.onSurfaceVariant,
     )
     Spacer24()
-    Button(onClick = onRetry) { Text(stringResource(R.string.recognition_try_again)) }
+    Button(modifier = Modifier.dpadFocusIndicator(), onClick = onRetry) { Text(stringResource(R.string.recognition_try_again)) }
 }
