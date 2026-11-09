@@ -13,6 +13,13 @@ import org.junit.Test
 class TvRemoteCursorTest {
 
     @Test
+    fun `cursor movement uses smaller steps while a direction key repeats`() {
+        assertTrue(tvCursorStepDp(0) > tvCursorStepDp(1))
+        assertTrue(tvCursorStepDp(1) > 0f)
+    }
+
+
+    @Test
     fun `first center press is not a toggle`() {
         val detector = DoubleCenterPressDetector()
         assertFalse(detector.onPress(1_000L))

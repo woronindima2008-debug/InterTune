@@ -29,6 +29,8 @@ import androidx.compose.material3.Icon
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.focusProperties
+import com.dd3boh.outertune.BuildConfig
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -125,7 +127,7 @@ private fun FloatingButton(onClick: () -> Unit, content: @Composable () -> Unit)
     val host = LocalTopBarGlassHost.current
     val glass = if (host != null) rememberGlassSpec() else null
     if (host == null || glass == null) {
-        FloatingActionButton(modifier = Modifier.padding(16.dp), onClick = onClick, content = content)
+        FloatingActionButton(modifier = Modifier.padding(16.dp).then(if (BuildConfig.BUILD_TYPE == "tv") Modifier.focusProperties { canFocus = false } else Modifier), onClick = onClick, content = content)
         return
     }
     val spec = GlassSpec(host.backdrop, glass.intensity)
@@ -133,6 +135,7 @@ private fun FloatingButton(onClick: () -> Unit, content: @Composable () -> Unit)
     FloatingActionButton(
         modifier = Modifier
             .padding(16.dp)
+            .then(if (BuildConfig.BUILD_TYPE == "tv") Modifier.focusProperties { canFocus = false } else Modifier)
             .drawnBy(host)
             .graphicsLayer()
             .floatingGlass(spec, shape, spec.buttonTint()),
