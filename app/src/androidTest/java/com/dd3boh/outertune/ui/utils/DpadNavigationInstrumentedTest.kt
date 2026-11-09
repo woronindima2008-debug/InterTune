@@ -21,6 +21,7 @@ import androidx.compose.material3.NavigationRailItem
 import androidx.compose.material3.Text
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
@@ -30,6 +31,7 @@ import androidx.compose.ui.platform.LocalInputModeManager
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.test.assertIsFocused
+import androidx.compose.ui.test.assertDoesNotExist
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performKeyInput
 import androidx.compose.ui.test.junit4.createComposeRule
@@ -155,5 +157,47 @@ class DpadNavigationInstrumentedTest {
             }.isSuccess
         }
         composeRule.runOnIdle { assert(!searchActive.value) }
+    }
+
+    @Test
+    fun fullScreenOverlayDoesNotLeakFocusToCoveredContent() {
+        val overlayFocus = FocusRequester()
+        val coveredFocus = FocusRequester()
+
+        composeRule.setContent {
+            val inputModeManager = LocalInputModeManager.current
+            LaunchedEffect(Unit) {
+                inputModeManager.requestInputMode(InputMode.Keyboard)
+                overlayFocus.requestFocus()
+            }
+            MaterialTheme {
+                Box(Modifier.fillMaxSize().dpadOverlayEscape(tvNavigation = true)) {
+                    Button(
+                        onClick = {},
+                        modifier = Modifier.align(Alignment.TopCenter)
+                            .focusRequester(coveredFocus).testTag("covered-content"),
+                    ) { Text("Covered page action") }
+                    Column(Modifier.fillMaxSize().dpadOverlay()) {
+                        Spacer(Modifier.weight(1f))
+                        Button(
+                            onClick = {},
+                            modifier = Modifier.align(Alignment.CenterHorizontally)
+                                .focusRequester(overlayFocus).testTag("overlay-action"),
+                        ) { Text("Overlay action") }
+                        Spacer(Modifier.weight(1f))
+                    }
+                }
+            }
+        }
+
+        composeRule.waitForIdle()
+        composeRule.onNodeWithTag("overlay-action").assertIsFocused()
+        composeRule.onNodeWithTag("overlay-action").performKeyInput {
+            keyDown(Key.DirectionDown)
+            keyUp(Key.DirectionDown)
+        }
+        composeRule.waitForIdle()
+        composeRule.onNodeWithTag("overlay-action").assertIsFocused()
+        composeRule.onNodeWithTag("covered-content").assertDoesNotExist()
     }
 }
