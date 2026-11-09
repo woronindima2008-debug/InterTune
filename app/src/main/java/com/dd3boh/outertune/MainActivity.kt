@@ -1902,7 +1902,10 @@ class MainActivity : ComponentActivity() {
                                         }
                                     } else Modifier
                                 )
-                                .dpadOverlayEscape(tvNavigation = BuildConfig.BUILD_TYPE == "tv")
+                                .dpadOverlayEscape(
+                                    tvNavigation = BuildConfig.BUILD_TYPE == "tv",
+                                    onSearchDown = { if (searchActive) { searchActive = false; true } else false },
+                                )
                         ) {
                             Log.v(MAIN_TAG, "RC-3")
 
