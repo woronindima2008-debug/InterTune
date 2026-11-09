@@ -1904,7 +1904,12 @@ class MainActivity : ComponentActivity() {
                                 )
                                 .dpadOverlayEscape(
                                     tvNavigation = BuildConfig.BUILD_TYPE == "tv",
-                                    onSearchDown = { if (searchActive) { searchActive = false; true } else false },
+                                    onSearchDown = {
+                                        if (searchActive && WindowInsets.ime.getBottom(LocalDensity.current) == 0) {
+                                            searchActive = false
+                                            true
+                                        } else false
+                                    },
                                 )
                         ) {
                             Log.v(MAIN_TAG, "RC-3")
