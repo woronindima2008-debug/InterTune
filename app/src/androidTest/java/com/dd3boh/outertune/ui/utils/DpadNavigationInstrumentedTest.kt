@@ -35,6 +35,8 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.test.assertIsFocused
 import androidx.compose.ui.test.assertIsNotFocused
+import androidx.compose.ui.test.assertIsNotEnabled
+import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performKeyInput
 import androidx.compose.ui.test.junit4.createComposeRule
@@ -43,6 +45,8 @@ import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import com.dd3boh.outertune.ui.menu.GridMenu
+import com.dd3boh.outertune.ui.menu.SleepTimerGridMenu
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalTestApi::class)
 @RunWith(AndroidJUnit4::class)
@@ -209,6 +213,28 @@ class DpadNavigationInstrumentedTest {
                 composeRule.onNodeWithTag("settings-first-result").assertIsFocused()
             }.isSuccess
         }
+    }
+
+    @Test
+    fun disabledSleepTimerMenuItemCannotBeActivated() {
+        var activated = false
+
+        composeRule.setContent {
+            MaterialTheme {
+                GridMenu(Modifier.fillMaxSize()) {
+                    SleepTimerGridMenu(
+                        modifier = Modifier.testTag("disabled-sleep-timer"),
+                        sleepTimerTimeLeft = 0L,
+                        enabled = false,
+                        onClick = { activated = true },
+                    )
+                }
+            }
+        }
+
+        composeRule.onNodeWithTag("disabled-sleep-timer").assertIsNotEnabled()
+        composeRule.onNodeWithTag("disabled-sleep-timer").performClick()
+        composeRule.runOnIdle { assert(!activated) }
     }
 
     @Test
