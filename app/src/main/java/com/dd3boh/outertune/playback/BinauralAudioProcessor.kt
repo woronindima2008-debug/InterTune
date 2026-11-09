@@ -57,7 +57,7 @@ import kotlin.math.tan
  *
  * No Android in here beyond the media3 interface, so the arithmetic is tested.
  */
-class BinauralAudioProcessor : BaseAudioProcessor() {
+class BinauralAudioProcessor(private val surroundEnabled: Boolean = Unreleased.SURROUND_IN) : BaseAudioProcessor() {
 
     /** Whether to render. Volatile: flipped on the main thread, read on the audio thread. */
     @Volatile
@@ -805,7 +805,7 @@ class BinauralAudioProcessor : BaseAudioProcessor() {
     override fun onConfigure(inputAudioFormat: AudioProcessor.AudioFormat): AudioProcessor.AudioFormat {
         if (!enabled) return AudioProcessor.AudioFormat.NOT_SET
         val channels = inputAudioFormat.channelCount
-        if (channels != 2 && (!Unreleased.SURROUND_IN || SurroundLayout.azimuths(channels, DEFAULT_STAGE_WIDTH) == null)) {
+        if (channels != 2 && (!surroundEnabled || SurroundLayout.azimuths(channels, DEFAULT_STAGE_WIDTH) == null)) {
             return AudioProcessor.AudioFormat.NOT_SET
         }
         if (inputAudioFormat.encoding != C.ENCODING_PCM_16BIT &&
