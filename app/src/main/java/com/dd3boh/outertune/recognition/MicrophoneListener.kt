@@ -53,6 +53,14 @@ class MicrophoneListener @Inject constructor(
     @ApplicationContext private val context: Context,
 ) {
 
+    // Unit tests use a stand-in recording even for the tv build, which inherits release and
+    // therefore correctly has BuildConfig.DEBUG=false. Keep the production gate intact.
+    private var testRoom: File? = null
+
+    internal constructor(context: Context, room: File) : this(context) {
+        testRoom = room
+    }
+
     /**
      * One window of audio and the wall-clock time its first sample was heard.
      *
@@ -266,8 +274,10 @@ class MicrophoneListener @Inject constructor(
      * Delete it (run-as ... rm files/room.pcm) to have the microphone back. A release build never looks.
      */
     private fun debugRoom(): File? {
-        if (!BuildConfig.DEBUG) return null
-        val file = File(context.filesDir, "room.pcm")
+        val file = testRoom ?: run {
+            if (!BuildConfig.DEBUG) return null
+            File(context.filesDir, "room.pcm")
+        }
         return file.takeIf { runCatching { it.canRead() && it.length() > 0 }.getOrDefault(false) }
     }
 
