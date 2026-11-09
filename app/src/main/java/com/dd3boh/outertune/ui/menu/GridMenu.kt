@@ -256,8 +256,10 @@ fun LazyGridScope.SleepTimerGridMenu(
                 .dpadFocusIndicator(ShapeDefaults.Large)
                 .heightIn(min = GridMenuItemHeight)
                 .clickable(
+                    enabled = enabled,
                     onClick = onClick
                 )
+                .alpha(if (enabled) 1f else 0.5f)
                 .padding(horizontal = 12.dp, vertical = 10.dp)
         ) {
             Box(
