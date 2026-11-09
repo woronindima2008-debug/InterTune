@@ -1,4 +1,5 @@
 name: Build Android TV APK
+# CI for the integrated TV navigation, player controls, and regression suite.
 
 concurrency:
   group: android-tv-${{ github.ref }}
