@@ -634,7 +634,7 @@ fun Modifier.dpadOverlayEscape(
                 DpadMove.NothingThere ->
                     dpadWrapsToTabs(direction, moved = false, redirected = false) && focusTabBar(view)
                 // Do not let focus fall through to a control hidden by a full-screen sheet.
-                DpadMove.Covered -> direction == DpadDirection.Up
+                DpadMove.Covered -> true
             }
         }
         if (!needsScreenSearch(anythingFocused[0], overlaysFocused.get())) return@onPreviewKeyEvent false
@@ -645,7 +645,7 @@ fun Modifier.dpadOverlayEscape(
             DpadMove.NothingThere ->
                 dpadWrapsToTabs(direction, moved = false, redirected = false) && focusTabBar(view)
             // Taken, so that Compose's own search does not go looking underneath.
-            DpadMove.Covered -> direction == DpadDirection.Up
+            DpadMove.Covered -> true
         }
     }.onKeyEvent { event ->
         // Up and down in ordinary content that nothing focused has taken. The rest stays with
