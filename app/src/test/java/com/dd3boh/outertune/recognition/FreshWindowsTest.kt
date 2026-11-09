@@ -88,7 +88,7 @@ class FreshWindowsTest {
         File(dir, "room.pcm").writeBytes(bytes.array())
         val listener = MicrophoneListener(object : ContextWrapper(null) {
             override fun getFilesDir(): File = dir
-        })
+        }, File(dir, "room.pcm"))
 
         withTimeout(30_000) {
             // Thirty tenth-of-a-second chunks in all, the last read just before the last window.
