@@ -255,6 +255,7 @@ import androidx.activity.compose.BackHandler
 import com.dd3boh.outertune.ui.utils.dpadOverlay
 import com.dd3boh.outertune.ui.utils.dpadOverlayEscape
 import com.dd3boh.outertune.ui.utils.tvRemoteCursor
+import com.dd3boh.outertune.ui.utils.TvRemoteCursorState
 import com.dd3boh.outertune.ui.utils.dpadTabBar
 import com.dd3boh.outertune.ui.utils.dpadBringIntoView
 import com.dd3boh.outertune.ui.utils.resetHeightOffset
@@ -472,51 +473,60 @@ class MainActivity : ComponentActivity() {
 
     private val remoteBackHandler = Handler(Looper.getMainLooper())
     private var lastRemoteBackAt = 0L
+    private var pendingBackShouldNavigate = false
     private var pendingRemoteBack: Runnable? = null
-    private val remoteCursorToggle = mutableIntStateOf(0)
+    private val tvRemoteCursor = TvRemoteCursorState()
+    private val remoteBackDoublePressWindowMs = 600L
 
     /**
-     * Android TV Back is a KEYCODE_BACK, and the IME can consume it before Compose sees it.
-     * Observe it at the Activity boundary so the first press can hide the keyboard and the
-     * second press can reliably toggle the in-app pointer. With the IME hidden, a single Back
-     * is delayed only for the double-press window and then sent to the normal Back dispatcher.
+     * Handle TV remote input before Android routes it to the currently focused Compose child.
+     * This makes pointer movement and OK independent of the focus tree on every app screen.
+     * Back remains a normal single press; two presses toggle the pointer. If the keyboard is
+     * open, the first press hides it but is still eligible to pair with the second press.
      */
     override fun dispatchKeyEvent(event: KeyEvent): Boolean {
-        if (BuildConfig.BUILD_TYPE == "tv" && event.keyCode == KeyEvent.KEYCODE_BACK) {
+        if (BuildConfig.BUILD_TYPE != "tv") return super.dispatchKeyEvent(event)
+
+        if (tvRemoteCursor.onKeyEvent(event)) return true
+
+        if (event.keyCode == KeyEvent.KEYCODE_BACK) {
             if (event.action == KeyEvent.ACTION_UP) return true
-            if (event.action == KeyEvent.ACTION_DOWN) {
-                if (event.repeatCount > 0) return true
-                val now = SystemClock.uptimeMillis()
-                if (lastRemoteBackAt != 0L && now - lastRemoteBackAt <= 380L) {
-                    lastRemoteBackAt = 0L
-                    pendingRemoteBack?.let(remoteBackHandler::removeCallbacks)
-                    pendingRemoteBack = null
-                    remoteCursorToggle.intValue++
-                    return true
-                }
+            if (event.action != KeyEvent.ACTION_DOWN || event.repeatCount > 0) return true
 
-                lastRemoteBackAt = now
-                val imeVisible = ViewCompat.getRootWindowInsets(window.decorView)
-                    ?.isVisible(WindowInsetsCompat.Type.ime()) == true
-                if (imeVisible) {
-                    WindowInsetsControllerCompat(window, window.decorView)
-                        .hide(WindowInsetsCompat.Type.ime())
-                    return true
-                }
-
-                val back = Runnable {
-                    if (lastRemoteBackAt == now) {
-                        lastRemoteBackAt = 0L
-                        pendingRemoteBack = null
-                        onBackPressedDispatcher.onBackPressed()
-                    }
-                }
+            val now = SystemClock.uptimeMillis()
+            if (lastRemoteBackAt != 0L && now - lastRemoteBackAt <= remoteBackDoublePressWindowMs) {
+                lastRemoteBackAt = 0L
                 pendingRemoteBack?.let(remoteBackHandler::removeCallbacks)
-                pendingRemoteBack = back
-                remoteBackHandler.postDelayed(back, 380L)
+                pendingRemoteBack = null
+                pendingBackShouldNavigate = false
+                tvRemoteCursor.toggle()
                 return true
             }
+
+            lastRemoteBackAt = now
+            val imeVisible = ViewCompat.getRootWindowInsets(window.decorView)
+                ?.isVisible(WindowInsetsCompat.Type.ime()) == true
+            pendingBackShouldNavigate = !imeVisible
+            if (imeVisible) {
+                WindowInsetsControllerCompat(window, window.decorView)
+                    .hide(WindowInsetsCompat.Type.ime())
+            }
+
+            val back = Runnable {
+                if (lastRemoteBackAt == now) {
+                    lastRemoteBackAt = 0L
+                    pendingRemoteBack = null
+                    val shouldNavigate = pendingBackShouldNavigate
+                    pendingBackShouldNavigate = false
+                    if (shouldNavigate) onBackPressedDispatcher.onBackPressed()
+                }
+            }
+            pendingRemoteBack?.let(remoteBackHandler::removeCallbacks)
+            pendingRemoteBack = back
+            remoteBackHandler.postDelayed(back, remoteBackDoublePressWindowMs)
+            return true
         }
+
         return super.dispatchKeyEvent(event)
     }
 
@@ -1953,7 +1963,7 @@ class MainActivity : ComponentActivity() {
                                 .fillMaxSize()
                                 .then(
                                     if (BuildConfig.BUILD_TYPE == "tv") {
-                                        Modifier.tvRemoteCursor(remoteCursorToggle.intValue)
+                                        Modifier.tvRemoteCursor(tvRemoteCursor)
                                     } else Modifier
                                 )
                                 .dpadOverlayEscape(
