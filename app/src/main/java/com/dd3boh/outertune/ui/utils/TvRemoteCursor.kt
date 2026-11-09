@@ -7,7 +7,12 @@
 package com.dd3boh.outertune.ui.utils
 
 import android.os.SystemClock
+import android.view.KeyEvent
 import android.view.MotionEvent
+import android.view.View
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.composed
 import androidx.compose.ui.draw.drawWithContent
@@ -15,107 +20,118 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.drawscope.Stroke
-import androidx.compose.ui.input.key.Key
-import androidx.compose.ui.input.key.KeyEventType
-import androidx.compose.ui.input.key.key
-import androidx.compose.ui.input.key.onPreviewKeyEvent
-import androidx.compose.ui.input.key.type
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalView
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.mutableIntStateOf
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.saveable.rememberSaveable
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 
 /**
- * In-app pointer for Android TV remotes.
- *
- * Two Back presses toggle pointer mode. A single Back is forwarded to the app's normal
- * back dispatcher after the double-press window, so existing BackHandlers keep their meaning.
- * In pointer mode the D-pad moves the pointer and OK sends a normal touch pair to the Compose
- * root view, letting existing buttons and click handlers work without accessibility access.
+ * Activity-owned pointer state. Key events are handled by MainActivity, not Compose focus,
+ * so the pointer remains usable even when no composable currently owns keyboard focus.
  */
-fun Modifier.tvRemoteCursor(toggleVersion: Int): Modifier = composed {
-    val view = LocalView.current
-    val density = LocalDensity.current
+class TvRemoteCursorState {
+    var enabled by mutableStateOf(false)
+        private set
+    var position by mutableStateOf(Offset.Zero)
+        private set
+    var size by mutableStateOf(IntSize.Zero)
+        private set
 
-    var enabled by rememberSaveable { mutableStateOf(false) }
-    var lastToggleVersion by remember { mutableIntStateOf(toggleVersion) }
-    var size by remember { mutableStateOf(IntSize.Zero) }
-    var position by remember { mutableStateOf(Offset.Zero) }
+    private var targetView: View? = null
 
-    LaunchedEffect(toggleVersion) {
-        if (toggleVersion != lastToggleVersion) {
-            enabled = !enabled
-            lastToggleVersion = toggleVersion
+    fun attach(view: View) {
+        targetView = view
+    }
+
+    fun detach(view: View) {
+        if (targetView === view) targetView = null
+    }
+
+    fun toggle() {
+        enabled = !enabled
+    }
+
+    fun onKeyEvent(event: KeyEvent): Boolean {
+        if (!enabled) return false
+        val direction = when (event.keyCode) {
+            KeyEvent.KEYCODE_DPAD_UP -> 0
+            KeyEvent.KEYCODE_DPAD_DOWN -> 1
+            KeyEvent.KEYCODE_DPAD_LEFT -> 2
+            KeyEvent.KEYCODE_DPAD_RIGHT -> 3
+            KeyEvent.KEYCODE_DPAD_CENTER, KeyEvent.KEYCODE_ENTER,
+            KeyEvent.KEYCODE_NUMPAD_ENTER -> 4
+            else -> return false
+        }
+
+        if (event.action == KeyEvent.ACTION_UP) return true
+        if (event.action != KeyEvent.ACTION_DOWN) return true
+
+        val view = targetView
+        val density = view?.resources?.displayMetrics?.density ?: 1f
+        val step = 32f * density
+        when (direction) {
+            0 -> position = Offset(position.x, (position.y - step).coerceAtLeast(0f))
+            1 -> position = Offset(position.x, (position.y + step).coerceAtMost((size.height - 1).coerceAtLeast(0).toFloat()))
+            2 -> position = Offset((position.x - step).coerceAtLeast(0f), position.y)
+            3 -> position = Offset((position.x + step).coerceAtMost((size.width - 1).coerceAtLeast(0).toFloat()), position.y)
+            4 -> if (event.repeatCount == 0) click()
+        }
+        return true
+    }
+
+    private fun click() {
+        val view = targetView ?: return
+        if (size == IntSize.Zero) return
+        val x = position.x.coerceIn(0f, (size.width - 1).coerceAtLeast(0).toFloat())
+        val y = position.y.coerceIn(0f, (size.height - 1).coerceAtLeast(0).toFloat())
+        val downTime = SystemClock.uptimeMillis()
+        val down = MotionEvent.obtain(downTime, downTime, MotionEvent.ACTION_DOWN, x, y, 0)
+        val up = MotionEvent.obtain(downTime, downTime + 1L, MotionEvent.ACTION_UP, x, y, 0)
+        try {
+            view.dispatchTouchEvent(down)
+            view.dispatchTouchEvent(up)
+        } finally {
+            down.recycle()
+            up.recycle()
         }
     }
 
-    val step = with(density) { 28.dp.toPx() }
+    fun updateSize(newSize: IntSize) {
+        size = newSize
+        position = if (position == Offset.Zero) {
+            Offset(newSize.width / 2f, newSize.height / 2f)
+        } else {
+            Offset(
+                position.x.coerceIn(0f, (newSize.width - 1).coerceAtLeast(0).toFloat()),
+                position.y.coerceIn(0f, (newSize.height - 1).coerceAtLeast(0).toFloat()),
+            )
+        }
+    }
+}
+
+/**
+ * Draws the pointer over the app. Input is deliberately not handled here: Activity dispatches
+ * D-pad and OK events before Android/Compose attempts to deliver them to the focused child.
+ */
+fun Modifier.tvRemoteCursor(cursor: TvRemoteCursorState): Modifier = composed {
+    val view = LocalView.current
+    val density = LocalDensity.current
     val pointerWidth = with(density) { 28.dp.toPx() }
     val pointerHeight = with(density) { 42.dp.toPx() }
 
-    this
-        .onSizeChanged { newSize ->
-            size = newSize
-            if (position == Offset.Zero) {
-                position = Offset(newSize.width / 2f, newSize.height / 2f)
-            } else {
-                position = Offset(
-                    position.x.coerceIn(0f, newSize.width.toFloat().coerceAtLeast(1f)),
-                    position.y.coerceIn(0f, newSize.height.toFloat().coerceAtLeast(1f)),
-                )
-            }
-        }
-        .onPreviewKeyEvent { event ->
-            if (!enabled) return@onPreviewKeyEvent false
-            val key = event.key
-            if (key !in setOf(
-                    Key.DirectionUp, Key.DirectionDown, Key.DirectionLeft,
-                    Key.DirectionRight, Key.DirectionCenter, Key.Enter, Key.NumPadEnter
-                )
-            ) return@onPreviewKeyEvent false
+    androidx.compose.runtime.DisposableEffect(view) {
+        cursor.attach(view)
+        onDispose { cursor.detach(view) }
+    }
 
-            if (event.type != KeyEventType.KeyDown) return@onPreviewKeyEvent true
-            when (key) {
-                Key.DirectionUp -> position = Offset(position.x, (position.y - step).coerceAtLeast(0f))
-                Key.DirectionDown -> position = Offset(position.x, (position.y + step).coerceAtMost(size.height.toFloat()))
-                Key.DirectionLeft -> position = Offset((position.x - step).coerceAtLeast(0f), position.y)
-                Key.DirectionRight -> position = Offset((position.x + step).coerceAtMost(size.width.toFloat()), position.y)
-                Key.DirectionCenter, Key.Enter, Key.NumPadEnter -> {
-                    if (size != IntSize.Zero) {
-                        val x = position.x.coerceIn(0f, (size.width - 1).coerceAtLeast(0).toFloat())
-                        val y = position.y.coerceIn(0f, (size.height - 1).coerceAtLeast(0).toFloat())
-                        val downTime = SystemClock.uptimeMillis()
-                        val downEvent = MotionEvent.obtain(
-                            downTime, downTime, MotionEvent.ACTION_DOWN, x, y, 0
-                        )
-                        val upEvent = MotionEvent.obtain(
-                            downTime, downTime + 1L, MotionEvent.ACTION_UP, x, y, 0
-                        )
-                        try {
-                            view.dispatchTouchEvent(downEvent)
-                            view.dispatchTouchEvent(upEvent)
-                        } finally {
-                            downEvent.recycle()
-                            upEvent.recycle()
-                        }
-                    }
-                }
-            }
-            true
-        }
+    this
+        .onSizeChanged(cursor::updateSize)
         .drawWithContent {
             drawContent()
-            if (enabled && size != IntSize.Zero) {
-                val x = position.x
-                val y = position.y
+            if (cursor.enabled && cursor.size != IntSize.Zero) {
+                val x = cursor.position.x
+                val y = cursor.position.y
                 val pointer = Path().apply {
                     moveTo(x, y)
                     lineTo(x + pointerWidth * 0.08f, y + pointerHeight)
