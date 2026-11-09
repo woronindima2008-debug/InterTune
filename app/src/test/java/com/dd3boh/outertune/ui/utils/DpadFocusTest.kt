@@ -32,6 +32,18 @@ class DpadFocusTest {
     private val libraryTab = Rect(369f, 490f, 480f, 568f)
 
     @Test
+    fun `initial focus chooses the uppermost then leftmost visible target`() {
+        val bounds = listOf(
+            Rect(220f, 20f, 280f, 80f),
+            Rect(20f, 20f, 80f, 80f),
+            Rect(20f, 100f, 80f, 160f),
+            Rect(0f, 0f, 0f, 0f),
+        )
+        assertEquals(1, firstDpadTargetIndex(bounds))
+        assertNull(firstDpadTargetIndex(listOf(Rect(0f, 0f, 0f, 0f))))
+    }
+
+    @Test
     fun `a list around a floating control is never a candidate`() {
         // What stranded focus on floating controls: the list encloses them, so it is neither
         // above nor below them.

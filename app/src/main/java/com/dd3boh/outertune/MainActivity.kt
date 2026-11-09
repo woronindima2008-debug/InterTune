@@ -502,6 +502,18 @@ class MainActivity : ComponentActivity() {
 
         if (tvRemoteCursor.onKeyEvent(event)) return true
 
+        // Compose's preview-key handler only runs while a descendant owns focus. On a fresh TV
+        // launch (or after a destination removes the focused control) there may be no such node,
+        // so the first arrow press would otherwise disappear before DpadFocus can recover it.
+        val isDpadArrow = when (event.keyCode) {
+            KeyEvent.KEYCODE_DPAD_UP, KeyEvent.KEYCODE_DPAD_DOWN,
+            KeyEvent.KEYCODE_DPAD_LEFT, KeyEvent.KEYCODE_DPAD_RIGHT -> true
+            else -> false
+        }
+        if (isDpadArrow && event.action == KeyEvent.ACTION_DOWN && event.repeatCount == 0 &&
+            tvRemoteCursor.focusFirstTarget()
+        ) return true
+
         return super.dispatchKeyEvent(event)
     }
 
@@ -1933,6 +1945,24 @@ class MainActivity : ComponentActivity() {
                             derivedStateOf { navigationItems.any { it.route == navBackStackEntry?.destination?.route } }
                         }
 
+                        // Establish focus when a TV destination first appears. The global D-pad
+                        // handler cannot receive keys until some child is focused; after the
+                        // transition settles, focus the selected tab on a tab root or the first
+                        // visible control on a detail/settings page. The Activity retries on the
+                        // first arrow key if a screen is still composing.
+                        LaunchedEffect(navBackStackEntry?.id, searchActive, oobeStatus, onTabRoot) {
+                            if (BuildConfig.BUILD_TYPE != "tv" || oobeStatus < OOBE_VERSION ||
+                                searchActive || navBackStackEntry == null
+                            ) return@LaunchedEffect
+
+                            kotlinx.coroutines.delay(350L)
+                            withFrameNanos { }
+                            val tabFocused = if (onTabRoot) {
+                                runCatching { selectedTabFocus.requestFocus() }.getOrDefault(false)
+                            } else false
+                            if (!tabFocused) tvRemoteCursor.focusFirstTarget()
+                        }
+
                         Box(
                             modifier = Modifier
                                 .fillMaxSize()
@@ -2279,9 +2309,11 @@ class MainActivity : ComponentActivity() {
 //                                                } == true
                                         // Named for a screen reader when slim, as in the bar above.
                                         val tabName = stringResource(screen.titleId)
+                                        val tabSelected = navBackStackEntry?.destination?.hierarchy?.any { it.route == screen.route } == true
                                         NavigationRailItem(
-                                            modifier = if (slimNav) Modifier.semantics { contentDescription = tabName } else Modifier,
-                                            selected = navBackStackEntry?.destination?.hierarchy?.any { it.route == screen.route } == true,
+                                            modifier = (if (tabSelected) Modifier.focusRequester(selectedTabFocus) else Modifier)
+                                                .then(if (slimNav) Modifier.semantics { contentDescription = tabName } else Modifier),
+                                            selected = tabSelected,
                                             icon = {
                                                 Icon(
                                                     screen.icon,

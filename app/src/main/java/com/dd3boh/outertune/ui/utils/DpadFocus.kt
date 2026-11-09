@@ -767,6 +767,20 @@ internal fun moveDpadFocusFromAnywhere(view: View, direction: DpadDirection): Bo
 }
 
 /**
+ * Gives the first visible focus target a screen can use when no composable currently owns focus.
+ */
+internal fun focusFirstDpadTarget(view: View): Boolean {
+    val owner = (view as? RootForTest)?.semanticsOwner ?: return false
+    return moveFromOverlay(owner.unmergedRootSemanticsNode, direction = null, fromAnywhere = true) == DpadMove.Moved
+}
+
+/** The uppermost, then leftmost, non-empty target; kept pure so its ordering is unit-tested. */
+internal fun firstDpadTargetIndex(bounds: List<Rect>): Int? =
+    bounds.indices
+        .filter { !bounds[it].isEmpty }
+        .minWithOrNull(compareBy<Int> { bounds[it].top }.thenBy { bounds[it].left })
+
+/**
  * What [moveFromOverlay] made of a key: a move, nothing in that direction, nothing in that
  * direction from a floating control that covers the screen, or a key it leaves to Compose.
  */
@@ -834,7 +848,7 @@ private fun moveFromOverlay(root: SemanticsNode, direction: DpadDirection?, from
         // Nothing has focus, typically because what had it has just gone: the queue opened over
         // the button that opened it, say. Compose would start from the top left of the whole
         // window, which may be a part closed to the keys, and then give up.
-        val first = visible.minWithOrNull(compareBy<Focusable> { it.bounds.top }.thenBy { it.bounds.left })
+        val first = firstDpadTargetIndex(visible.map { it.bounds })?.let(visible::get)
         return if (first?.requestFocus() == true) DpadMove.Moved else DpadMove.NothingThere
     }
     if (direction == null) return DpadMove.NotOurs

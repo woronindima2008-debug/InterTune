@@ -364,6 +364,15 @@ private fun SearchBarInputField(
         colors.focusedTextColor
     }
 
+    // Opening search from a TV remote is a focus transition, not a touch. Move focus into the
+    // editable field after it has been placed so the TV keyboard appears and typed input is ready.
+    LaunchedEffect(active) {
+        if (active) {
+            withFrameNanos { }
+            runCatching { focusRequester.requestFocus() }
+        }
+    }
+
     Row(
         verticalAlignment = Alignment.CenterVertically,
         modifier = modifier
