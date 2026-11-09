@@ -248,6 +248,7 @@ import androidx.compose.ui.focus.FocusRequester
 import androidx.activity.compose.BackHandler
 import com.dd3boh.outertune.ui.utils.dpadOverlay
 import com.dd3boh.outertune.ui.utils.dpadOverlayEscape
+import com.dd3boh.outertune.ui.utils.tvRemoteCursor
 import com.dd3boh.outertune.ui.utils.dpadTabBar
 import com.dd3boh.outertune.ui.utils.dpadBringIntoView
 import com.dd3boh.outertune.ui.utils.resetHeightOffset
@@ -1894,6 +1895,13 @@ class MainActivity : ComponentActivity() {
                         Box(
                             modifier = Modifier
                                 .fillMaxSize()
+                                .then(
+                                    if (BuildConfig.BUILD_TYPE == "tv") {
+                                        Modifier.tvRemoteCursor {
+                                            onBackPressedDispatcher.onBackPressed()
+                                        }
+                                    } else Modifier
+                                )
                                 .dpadOverlayEscape(tvNavigation = BuildConfig.BUILD_TYPE == "tv")
                         ) {
                             Log.v(MAIN_TAG, "RC-3")
