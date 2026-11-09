@@ -121,6 +121,23 @@ class CastServerTest {
 
     private fun head(url: String): Response = client.newCall(Request.Builder().url(url).head().build()).execute()
 
+    /** Closing a listening socket can leave a just-queued TCP handshake visible briefly on Linux. */
+    private fun assertEventuallyRefuses(host: String, port: Int) {
+        val deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(2)
+        var connected = false
+        while (System.nanoTime() < deadline) {
+            connected = try {
+                Socket().use { it.connect(InetSocketAddress(host, port), 100) }
+                true
+            } catch (_: IOException) {
+                false
+            }
+            if (!connected) return
+            Thread.sleep(25)
+        }
+        assertFalse("Still accepting connections on $host:$port after stop", connected)
+    }
+
     @Test
     fun `HEAD describes the song without sending it`() {
         val song = FakeSong(5000)
@@ -600,11 +617,7 @@ class CastServerTest {
             } catch (expected: IOException) {
             }
         }
-        try {
-            Socket().use { it.connect(InetSocketAddress("127.0.0.1", port), 2000) }
-            fail("Still listening after stop")
-        } catch (expected: IOException) {
-        }
+        assertEventuallyRefuses("127.0.0.1", port)
         server.stop()
     }
 
@@ -658,11 +671,7 @@ class CastServerTest {
 
         server.stop()
         for (host in listOf("127.0.0.1", "127.0.0.2")) {
-            try {
-                Socket().use { it.connect(InetSocketAddress(host, port), 2000) }
-                fail("Still listening on $host after stop")
-            } catch (expected: IOException) {
-            }
+            assertEventuallyRefuses(host, port)
         }
     }
 
