@@ -27,6 +27,26 @@ import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 
 /**
+ * Recognizes two consecutive OK/Enter presses. Kept independent of Android KeyEvent so the
+ * timing rule can be unit-tested without an Activity or a TV device.
+ */
+internal class DoubleCenterPressDetector(
+    private val windowMs: Long = 600L,
+) {
+    private var lastPressAt = Long.MIN_VALUE
+
+    fun onPress(nowMs: Long): Boolean {
+        val elapsed = nowMs - lastPressAt
+        if (lastPressAt != Long.MIN_VALUE && elapsed in 0..windowMs) {
+            lastPressAt = Long.MIN_VALUE
+            return true
+        }
+        lastPressAt = nowMs
+        return false
+    }
+}
+
+/**
  * Activity-owned pointer state. Key events are handled by MainActivity, not Compose focus,
  * so the pointer remains usable even when no composable currently owns keyboard focus.
  */

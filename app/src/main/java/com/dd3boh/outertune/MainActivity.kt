@@ -476,6 +476,8 @@ class MainActivity : ComponentActivity() {
     private var pendingBackShouldNavigate = false
     private var pendingRemoteBack: Runnable? = null
     private val tvRemoteCursor = TvRemoteCursorState()
+    private val remoteCenterPressDetector = DoubleCenterPressDetector(600L)
+    private var consumeRemoteCenterKeyUp = false
     private val remoteBackDoublePressWindowMs = 600L
 
     /**
@@ -486,6 +488,24 @@ class MainActivity : ComponentActivity() {
      */
     override fun dispatchKeyEvent(event: KeyEvent): Boolean {
         if (BuildConfig.BUILD_TYPE != "tv") return super.dispatchKeyEvent(event)
+
+        val isCenterKey = event.keyCode == KeyEvent.KEYCODE_DPAD_CENTER ||
+            event.keyCode == KeyEvent.KEYCODE_ENTER ||
+            event.keyCode == KeyEvent.KEYCODE_NUMPAD_ENTER
+
+        // The first OK remains a normal click/activation. A second OK within 600 ms toggles the
+        // pointer; consume that second key-up too, so it cannot activate the focused control.
+        if (isCenterKey && event.action == KeyEvent.ACTION_UP && consumeRemoteCenterKeyUp) {
+            consumeRemoteCenterKeyUp = false
+            return true
+        }
+        if (isCenterKey && event.action == KeyEvent.ACTION_DOWN && event.repeatCount == 0 &&
+            remoteCenterPressDetector.onPress(SystemClock.uptimeMillis())
+        ) {
+            consumeRemoteCenterKeyUp = true
+            tvRemoteCursor.toggle()
+            return true
+        }
 
         if (tvRemoteCursor.onKeyEvent(event)) return true
 
