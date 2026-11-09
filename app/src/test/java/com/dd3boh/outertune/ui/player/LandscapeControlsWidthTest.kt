@@ -97,6 +97,7 @@ class LandscapeControlsWidthTest {
             maxControlsFraction = 0.78f,
             slot = 48.dp,
             playButtonGap = 6.dp,
+            mustFitControls = true,
         )
         assertEquals(396f, width.value, 0.01f)
         assertTrue(width <= 480.dp)
