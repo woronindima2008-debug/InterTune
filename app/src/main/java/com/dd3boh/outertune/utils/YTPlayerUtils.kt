@@ -577,6 +577,10 @@ object YTPlayerUtils {
     @Volatile
     var askWebClientFirst: Boolean = false
 
+    /** Test-only opt-in for exercising the gated trial in release-based variants such as TV. */
+    @Volatile
+    internal var webClientFirstEnabledOverride: Boolean? = null
+
     /** The developer's "Stream over SABR only": see Unreleased.SABR. Set by MusicService in a debug build. */
     @Volatile
     var sabrOnly: Boolean = false
@@ -1458,7 +1462,7 @@ object YTPlayerUtils {
         // The experiment: see TRIAL_CLIENT. Its client is asked only when there is a player
         // script to ask it with, and the script and the solving share one allowance of time.
         // Without the account when nothing is to be asked as it: see TRIAL_CLIENT_AS_VISITOR.
-        val trialOn = Unreleased.WEB_CLIENT_FIRST && askWebClientFirst
+        val trialOn = (webClientFirstEnabledOverride ?: Unreleased.WEB_CLIENT_FIRST) && askWebClientFirst
         val trialAsVisitor = isLoggedIn && authMode == PlaybackAuthMode.NEVER
         val trialWanted = (if (trialAsVisitor) TRIAL_CLIENT_AS_VISITOR else TRIAL_CLIENT).takeIf { trialOn }
         // The web client as one of the chain's own: see WEB_FALLBACK_CLIENT.
