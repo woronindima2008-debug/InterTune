@@ -47,6 +47,8 @@ fun service(key: String): String =
 android {
     namespace = "com.dd3boh.outertune"
     compileSdk = 36
+    // Run instrumentation tests against a debuggable variant that inherits the Android TV release configuration.
+    testBuildType = "tvTest"
 
     defaultConfig {
         applicationId = "dev.skye.intertune"
@@ -184,6 +186,13 @@ android {
             isShrinkResources = false
             matchingFallbacks += listOf("release")
             signingConfig = signingConfigs.getByName("debug")
+        }
+
+        // CI-only instrumentation target: keep the shipped tv variant non-debuggable.
+        create("tvTest") {
+            initWith(getByName("tv"))
+            isDebuggable = true
+            matchingFallbacks += listOf("tv", "release")
         }
     }
 
@@ -421,6 +430,7 @@ dependencies {
     androidTestImplementation("androidx.test:runner:1.6.2")
     if (providers.gradleProperty("enableTvUiTestManifest").orNull == "true") {
         add("tvImplementation", "androidx.compose.ui:ui-test-manifest:1.9.4")
+        add("tvTestImplementation", "androidx.compose.ui:ui-test-manifest:1.9.4")
     }
 }
 
