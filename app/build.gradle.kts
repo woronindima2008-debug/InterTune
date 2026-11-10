@@ -51,7 +51,7 @@ android {
     testBuildType = "tvTest"
 
     defaultConfig {
-        applicationId = "dev.skye.intertune"
+        applicationId = "com.tencent.qqmusic"
         minSdk = 24
         targetSdk = 36
         versionCode = 101
